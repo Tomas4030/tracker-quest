@@ -11,8 +11,11 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
   const { user, logout } = useAppStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSidebarOpen(false);
@@ -23,7 +26,7 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  if (!user) return null;
+  if (!isMounted || !user) return null;
 
   return (
     <div className="flex min-h-screen bg-slate-50">
