@@ -213,4 +213,33 @@ create policy projects_all_authenticated
   using (true)
   with check (true);
 
+-- Bootstrap do perfil admin (requer que o utilizador exista em auth.users)
+insert into public.users (
+  id,
+  name,
+  email,
+  role,
+  active,
+  created_at,
+  updated_at
+)
+select
+  au.id,
+  coalesce(
+    nullif(trim(au.raw_user_meta_data ->> 'name'), ''),
+    'Administrador'
+  ) as name,
+  au.email,
+  'admin' as role,
+  true as active,
+  now() as created_at,
+  now() as updated_at
+from auth.users au
+where lower(au.email) = lower('admin@estagio.pt')
+on conflict (id)
+do update set
+  role = 'admin',
+  active = true,
+  updated_at = now();
+
 commit;

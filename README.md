@@ -12,7 +12,6 @@ Aplicação moderna de gestão de atividades em estágio, desenvolvida com Next.
 - ✅ **Painel Admin**: Gerir contas, equipas, projetos e atividades
 - ✅ **Relatórios AI**: Relatórios inteligentes com fallback local
 - ✅ **Design Mobile-First**: Funciona em desktop, tablet e móvel
-- ✅ **Modo Demo**: Dados armazenados em localStorage
 
 ## 🛠️ Stack Tecnológico
 
@@ -28,7 +27,7 @@ Aplicação moderna de gestão de atividades em estágio, desenvolvida com Next.
 
 - Node.js 18+
 - npm ou yarn
-- Conta no Supabase (opcional - app funciona em modo demo)
+- Conta no Supabase
 
 ## 🔧 Instalação
 
@@ -51,7 +50,7 @@ npm install
 # Copiar ficheiro de exemplo
 cp .env.local.example .env.local
 
-# Editar .env.local com as tuas credenciais do Supabase (opcional)
+# Editar .env.local com as tuas credenciais do Supabase
 ```
 
 4. **Iniciar servidor de desenvolvimento**
@@ -106,16 +105,6 @@ src/
 └── next.config.mjs
 ```
 
-## 🔐 Autenticação Demo
-
-A aplicação vem com dados de demo pré-carregados:
-
-| Tipo       | Email            | Palavra-passe |
-| ---------- | ---------------- | ------------- |
-| Admin      | admin@estagio.pt | admin123      |
-| Estagiário | ana@estagio.pt   | ana123        |
-| Estagiário | bruno@estagio.pt | bruno123      |
-
 ## 🌐 Integração Supabase
 
 ### Passo 1: Criar Projeto Supabase
@@ -126,6 +115,7 @@ A aplicação vem com dados de demo pré-carregados:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (para bootstrap de admin)
 - `GROUP_API_KEY`
 
 ### Passo 2: Criar Tabelas
@@ -159,6 +149,19 @@ create policy ...;
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY=YOUR_SERVICE_ROLE_KEY
+```
+
+### Passo 4: Criar conta admin
+
+```bash
+ADMIN_EMAIL=admin@estagio.pt ADMIN_PASSWORD=<PASSWORD_FORTE> npm run create:admin
+```
+
+No PowerShell:
+
+```powershell
+$env:ADMIN_EMAIL="admin@estagio.pt"; $env:ADMIN_PASSWORD="<PASSWORD_FORTE>"; npm run create:admin
 ```
 
 ### Passo 4: Atualizar Serviço de Autenticação

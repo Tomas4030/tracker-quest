@@ -6,7 +6,7 @@ Guia de configuração da aplicação com Next.js e Supabase.
 
 - Node.js 18+
 - npm
-- Conta Supabase opcional
+- Conta Supabase
 
 ## Instalação
 
@@ -24,18 +24,18 @@ Copia `.env.local.example` para `.env.local` e ajusta os valores:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 GROUP_API_KEY=
 NEXT_PUBLIC_APP_NAME=EstágioTrack
 ```
-
-Se deixares as variáveis vazias, a aplicação corre em modo demo com `localStorage` e o relatório inteligente usa o fallback local.
 
 ## Supabase
 
 1. Cria um projeto em https://supabase.com
 2. Vai a `Settings > API`
 3. Copia o `Project URL` e o `anon public key`
-4. Coloca os valores em `.env.local`
+4. Copia também a `service_role key`
+5. Coloca os valores em `.env.local`
 
 ## Tabelas
 
@@ -47,6 +47,20 @@ Ele pode ser corrido várias vezes sem rebentar em tabelas/índices/policies já
 3. Executa
 
 Script principal: `supabase/safe_schema.sql`
+
+## Criar admin inicial
+
+Com as variáveis acima configuradas:
+
+```bash
+ADMIN_EMAIL=admin@estagio.pt ADMIN_PASSWORD=<PASSWORD_FORTE> npm run create:admin
+```
+
+PowerShell:
+
+```powershell
+$env:ADMIN_EMAIL="admin@estagio.pt"; $env:ADMIN_PASSWORD="<PASSWORD_FORTE>"; npm run create:admin
+```
 
 Resumo do que ele faz:
 

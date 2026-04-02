@@ -63,16 +63,31 @@ export const AdminOverviewPage: React.FC = () => {
   const [formActive, setFormActive] = useState(true);
   const [formNotes, setFormNotes] = useState("");
 
-  const refreshData = () => {
-    setUsers(authService.getAll());
-    setProjects(projectService.getAll());
-    setTeams(teamService.getAll());
-    activityService.getAll().then(setActivities);
+  const refreshData = async () => {
+    const [loadedUsers, loadedProjects, loadedTeams, loadedActivities] =
+      await Promise.all([
+        authService.loadAll(),
+        projectService.loadAll(),
+        teamService.loadAll(),
+        activityService.getAll(),
+      ]);
+
+    setUsers(loadedUsers);
+    setProjects(loadedProjects);
+    setTeams(loadedTeams);
+    setActivities(loadedActivities);
   };
 
   useEffect(() => {
-    loadActivities();
-    refreshData();
+    loadActivities()
+      .then(() => refreshData())
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Erro ao carregar dados de administração.",
+        );
+      });
   }, [loadActivities]);
 
   useEffect(() => {
@@ -180,9 +195,13 @@ export const AdminOverviewPage: React.FC = () => {
     try {
       const team = teams.find((item) => item.id === formTeamId) || null;
       const hasNewPassword = Boolean(formPassword.trim());
-      const generatedPassword = hasNewPassword
-        ? formPassword.trim()
-        : createTempPassword(formName);
+
+      if (editingUserId && hasNewPassword) {
+        setError(
+          "Alterar palavra-passe exige chave service_role. Faz isso no painel Auth do Supabase.",
+        );
+        return;
+      }
 
       if (editingUserId) {
         await authService.updateUser(editingUserId, {
@@ -196,14 +215,11 @@ export const AdminOverviewPage: React.FC = () => {
           groupCode: team?.groupCode || formGroupCode,
           projectIds: formProjectIds,
         });
-        if (hasNewPassword) {
-          await authService.resetPassword(editingUserId, generatedPassword);
-        }
       } else {
         await authService.createAccount({
           name: formName,
           email: formEmail,
-          password: generatedPassword,
+          password: formPassword.trim() || createTempPassword(formName),
           role: formRole,
           active: formActive,
           teamId: team?.id,
@@ -216,7 +232,7 @@ export const AdminOverviewPage: React.FC = () => {
       if (team) {
         await authService.assignUserTeam(
           editingUserId ||
-            authService.getAll().find((item) => item.email === formEmail)?.id ||
+            users.find((item) => item.email === formEmail)?.id ||
             "",
           team,
         );
@@ -231,7 +247,7 @@ export const AdminOverviewPage: React.FC = () => {
           ? "Conta atualizada com sucesso."
           : "Conta criada com sucesso.",
       );
-      refreshData();
+      await refreshData();
       setTimeout(() => {
         closeModal();
         setSuccess(null);
@@ -246,7 +262,7 @@ export const AdminOverviewPage: React.FC = () => {
   const toggleUserActive = async (user: User) => {
     try {
       await authService.toggleUserActive(user.id, user.active === false);
-      refreshData();
+      await refreshData();
       setSuccess(
         user.active === false ? "Conta ativada." : "Conta desativada.",
       );

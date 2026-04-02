@@ -94,9 +94,25 @@ export const CalendarPage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    loadActivities(user.role === "admin" ? undefined : user.id);
-    setUsers(authService.getAll());
-    setProjects(projectService.getAll());
+    const loadContext = async () => {
+      await loadActivities(user.role === "admin" ? undefined : user.id);
+      const [loadedUsers, loadedProjects] = await Promise.all([
+        authService.loadAll(),
+        projectService.loadAll(),
+      ]);
+      setUsers(loadedUsers);
+      setProjects(loadedProjects);
+    };
+
+    loadContext().catch((error: unknown) => {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Erro ao carregar dados do calendário.",
+      );
+      setUsers([]);
+      setProjects([]);
+    });
   }, [user, loadActivities]);
 
   const visibleActivities = useMemo(() => {

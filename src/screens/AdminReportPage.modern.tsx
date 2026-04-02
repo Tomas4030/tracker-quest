@@ -14,7 +14,7 @@ import {
   StatCard,
 } from "@/components";
 import { reportService, authService } from "@/services";
-import type { SmartReport } from "@/types";
+import type { SmartReport, User } from "@/types";
 import { formatHours, formatDate } from "@/utils/helpers";
 
 export const AdminReportPage: React.FC = () => {
@@ -22,11 +22,11 @@ export const AdminReportPage: React.FC = () => {
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
   const [teamId, setTeamId] = useState("");
   const [userId, setUserId] = useState("");
+  const [users, setUsers] = useState<User[]>([]);
   const [report, setReport] = useState<SmartReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const users = authService.getAll();
   const teams = users
     .filter((user) => user.teamId)
     .map((user) => ({ id: user.teamId!, name: user.teamName || user.teamId! }))
@@ -56,6 +56,13 @@ export const AdminReportPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    authService
+      .loadAll()
+      .then((loaded) => setUsers(loaded))
+      .catch(() => setUsers([]));
+  }, []);
 
   useEffect(() => {
     loadReport();

@@ -8,8 +8,8 @@ async function getLocalPayload(
   payload: Pick<ReportRequestPayload, "scope" | "userId" | "teamId" | "period">,
 ): Promise<ReportRequestPayload> {
   const activities = await activityService.getAll();
-  const users = authService.getAll();
-  const projects = projectService.getAll();
+  const users = await authService.loadAll();
+  const projects = await projectService.loadAll();
 
   let scopedActivities = activities;
   let scopedUsers = users;

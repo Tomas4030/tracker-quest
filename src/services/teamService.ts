@@ -1,42 +1,48 @@
 import type { Team } from "@/types";
-
-const DEMO_TEAMS: Team[] = [
-  {
-    id: "t1",
-    name: "Produto Digital",
-    company: "EstágioTrack",
-    groupCode: "GRP-2026-A",
-    memberIds: ["u2"],
-    active: true,
-  },
-  {
-    id: "t2",
-    name: "Data & Operações",
-    company: "EstágioTrack",
-    groupCode: "GRP-2026-B",
-    memberIds: ["u3"],
-    active: true,
-  },
-];
-
-function readTeams(): Team[] {
-  if (typeof window === "undefined") return DEMO_TEAMS;
-  const stored = localStorage.getItem("estagio_teams");
-  if (stored) return JSON.parse(stored) as Team[];
-  localStorage.setItem("estagio_teams", JSON.stringify(DEMO_TEAMS));
-  return DEMO_TEAMS;
-}
-
-function writeTeams(teams: Team[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("estagio_teams", JSON.stringify(teams));
-}
+import { supabase } from "./supabase";
 
 class TeamService {
-  private teams: Team[] = readTeams();
+  private teams: Team[] = [];
+
+  private _mapDbTeam(row: {
+    id: string;
+    name: string;
+    company: string;
+    group_code: string;
+    member_ids: string[];
+    active: boolean;
+    created_at?: string;
+    updated_at?: string;
+  }): Team {
+    return {
+      id: row.id,
+      name: row.name,
+      company: row.company,
+      groupCode: row.group_code,
+      memberIds: row.member_ids || [],
+      active: row.active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async loadAll(): Promise<Team[]> {
+    if (!supabase) {
+      this.teams = [];
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("teams")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    this.teams = (data || []).map((item) => this._mapDbTeam(item));
+    return this.teams;
+  }
 
   private refresh(): Team[] {
-    this.teams = readTeams();
     return this.teams;
   }
 
@@ -52,34 +58,64 @@ class TeamService {
     return this.refresh().find((team) => team.id === id);
   }
 
-  create(team: Omit<Team, "id" | "createdAt" | "updatedAt">): Team {
-    const newTeam: Team = {
-      ...team,
-      id: `t${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    this.teams = [...this.refresh(), newTeam];
-    writeTeams(this.teams);
-    return newTeam;
+  async create(
+    team: Omit<Team, "id" | "createdAt" | "updatedAt">,
+  ): Promise<Team> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
+
+    const { data, error } = await supabase
+      .from("teams")
+      .insert({
+        name: team.name,
+        company: team.company,
+        group_code: team.groupCode,
+        member_ids: team.memberIds || [],
+        active: team.active,
+      })
+      .select("*")
+      .single();
+
+    if (error) throw new Error(error.message);
+    const mapped = this._mapDbTeam(data);
+    this.teams = [...this.refresh(), mapped];
+    return mapped;
   }
 
-  update(id: string, updates: Partial<Team>): Team {
+  async update(id: string, updates: Partial<Team>): Promise<Team> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
+
+    const { data, error } = await supabase
+      .from("teams")
+      .update({
+        name: updates.name,
+        company: updates.company,
+        group_code: updates.groupCode,
+        member_ids: updates.memberIds,
+        active: updates.active,
+      })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    const mapped = this._mapDbTeam(data);
     const teams = this.refresh();
     const index = teams.findIndex((team) => team.id === id);
-    if (index === -1) throw new Error("Team not found");
-    const updated: Team = {
-      ...teams[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    teams[index] = updated;
+    if (index === -1) {
+      this.teams = [...teams, mapped];
+      return mapped;
+    }
+    teams[index] = mapped;
     this.teams = teams;
-    writeTeams(this.teams);
-    return updated;
+    return mapped;
   }
 
-  toggleActive(id: string, active: boolean): Team {
+  async toggleActive(id: string, active: boolean): Promise<Team> {
     return this.update(id, { active });
   }
 }

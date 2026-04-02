@@ -1,53 +1,50 @@
 import type { Project } from "@/types";
-
-const DEMO_PROJECTS: Project[] = [
-  {
-    id: "p1",
-    name: "Portal Interno",
-    code: "INT-01",
-    description: "Backoffice de acompanhamento diário dos estagiários.",
-    teamId: "t1",
-    color: "#1a56db",
-    active: true,
-  },
-  {
-    id: "p2",
-    name: "Aplicação X",
-    code: "APP-02",
-    description: "Funcionalidades de registo, métricas e relatórios.",
-    teamId: "t1",
-    color: "#0f172a",
-    active: true,
-  },
-  {
-    id: "p3",
-    name: "Data Hub",
-    code: "DATA-03",
-    description: "Organização do schema e integração com Supabase.",
-    teamId: "t2",
-    color: "#0ea5e9",
-    active: true,
-  },
-];
-
-function readProjects(): Project[] {
-  if (typeof window === "undefined") return DEMO_PROJECTS;
-  const stored = localStorage.getItem("estagio_projects");
-  if (stored) return JSON.parse(stored) as Project[];
-  localStorage.setItem("estagio_projects", JSON.stringify(DEMO_PROJECTS));
-  return DEMO_PROJECTS;
-}
-
-function writeProjects(projects: Project[]): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem("estagio_projects", JSON.stringify(projects));
-}
+import { supabase } from "./supabase";
 
 class ProjectService {
-  private projects: Project[] = readProjects();
+  private projects: Project[] = [];
+
+  private _mapDbProject(row: {
+    id: string;
+    name: string;
+    code: string;
+    description?: string | null;
+    team_id?: string | null;
+    color: string;
+    active: boolean;
+    created_at?: string;
+    updated_at?: string;
+  }): Project {
+    return {
+      id: row.id,
+      name: row.name,
+      code: row.code,
+      description: row.description || undefined,
+      teamId: row.team_id || undefined,
+      color: row.color,
+      active: row.active,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  async loadAll(): Promise<Project[]> {
+    if (!supabase) {
+      this.projects = [];
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+    this.projects = (data || []).map((item) => this._mapDbProject(item));
+    return this.projects;
+  }
 
   private refresh(): Project[] {
-    this.projects = readProjects();
     return this.projects;
   }
 
@@ -63,34 +60,66 @@ class ProjectService {
     return this.refresh().find((project) => project.id === id);
   }
 
-  create(project: Omit<Project, "id" | "createdAt" | "updatedAt">): Project {
-    const newProject: Project = {
-      ...project,
-      id: `p${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    this.projects = [...this.refresh(), newProject];
-    writeProjects(this.projects);
-    return newProject;
+  async create(
+    project: Omit<Project, "id" | "createdAt" | "updatedAt">,
+  ): Promise<Project> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
+
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({
+        name: project.name,
+        code: project.code,
+        description: project.description,
+        team_id: project.teamId,
+        color: project.color,
+        active: project.active,
+      })
+      .select("*")
+      .single();
+
+    if (error) throw new Error(error.message);
+    const mapped = this._mapDbProject(data);
+    this.projects = [...this.refresh(), mapped];
+    return mapped;
   }
 
-  update(id: string, updates: Partial<Project>): Project {
+  async update(id: string, updates: Partial<Project>): Promise<Project> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
+
+    const { data, error } = await supabase
+      .from("projects")
+      .update({
+        name: updates.name,
+        code: updates.code,
+        description: updates.description,
+        team_id: updates.teamId,
+        color: updates.color,
+        active: updates.active,
+      })
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    const mapped = this._mapDbProject(data);
     const projects = this.refresh();
     const index = projects.findIndex((project) => project.id === id);
-    if (index === -1) throw new Error("Project not found");
-    const updated: Project = {
-      ...projects[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-    projects[index] = updated;
+    if (index === -1) {
+      this.projects = [...projects, mapped];
+      return mapped;
+    }
+    projects[index] = mapped;
     this.projects = projects;
-    writeProjects(this.projects);
-    return updated;
+    return mapped;
   }
 
-  toggleActive(id: string, active: boolean): Project {
+  async toggleActive(id: string, active: boolean): Promise<Project> {
     return this.update(id, { active });
   }
 }

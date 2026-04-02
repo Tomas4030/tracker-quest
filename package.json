@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "create:admin": "node scripts/create-admin.mjs"
   },
   "dependencies": {
     "next": "^14.2.30",

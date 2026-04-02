@@ -3,75 +3,13 @@ import { supabase } from "./supabase";
 import { teamService } from "./teamService";
 import { projectService } from "./projectService";
 
-const DEMO_USERS: User[] = [
-  {
-    id: "u1",
-    name: "Administrador",
-    email: "admin@estagio.pt",
-    role: "admin",
-    active: true,
-  },
-  {
-    id: "u2",
-    name: "Ana Ferreira",
-    email: "ana@estagio.pt",
-    role: "estagiario",
-    active: true,
-    teamId: "t1",
-    teamName: "Produto Digital",
-    company: "EstágioTrack",
-    projectIds: ["p1", "p2"],
-    groupCode: "GRP-2026-A",
-  },
-  {
-    id: "u3",
-    name: "Bruno Silva",
-    email: "bruno@estagio.pt",
-    role: "estagiario",
-    active: true,
-    teamId: "t2",
-    teamName: "Data & Operações",
-    company: "EstágioTrack",
-    projectIds: ["p3"],
-    groupCode: "GRP-2026-B",
-  },
-];
+const ADMIN_EMAIL = "admin@estagio.pt";
 
-const DEMO_PASSWORDS: Record<string, string> = {
-  "admin@estagio.pt": "admin123",
-  "ana@estagio.pt": "ana123",
-  "bruno@estagio.pt": "bruno123",
-};
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 class AuthService {
   private users: User[] = [];
-
-  constructor() {
-    this._loadUsersFromStorage();
-  }
-
-  private _loadUsersFromStorage() {
-    if (typeof window === "undefined") {
-      this.users = DEMO_USERS;
-      return;
-    }
-
-    const stored = localStorage.getItem("estagio_users");
-    if (stored) {
-      this.users = JSON.parse(stored).map((user: User) => ({
-        active: true,
-        ...user,
-      }));
-    } else {
-      this.users = DEMO_USERS;
-      this._saveUsersToStorage();
-    }
-  }
-
-  private _saveUsersToStorage() {
-    if (typeof window === "undefined") return;
-    localStorage.setItem("estagio_users", JSON.stringify(this.users));
-  }
 
   private _persistCurrentUser(user: User | null) {
     if (typeof window === "undefined") return;
@@ -101,89 +39,117 @@ class AuthService {
       .filter((project): project is Project => Boolean(project));
   }
 
-  private _findUserByEmail(email: string): User | undefined {
-    return this.users.find((user) => user.email === email);
+  private _isUuid(value?: string): boolean {
+    if (!value) return false;
+    return UUID_REGEX.test(value);
   }
 
-  private _findDemoUserByEmail(email: string): User | undefined {
-    return DEMO_USERS.find((user) => user.email === email);
+  private _upsertUserInCache(user: User): void {
+    const index = this.users.findIndex((item) => item.id === user.id);
+    if (index === -1) {
+      this.users = [...this.users, user];
+      return;
+    }
+    this.users[index] = user;
   }
 
-  private _persistDemoUserIfMissing(user: User) {
-    if (this._findUserByEmail(user.email)) return;
-    this.users.push(user);
-    this._saveUsersToStorage();
+  private _mapDbUser(profile: {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+    active?: boolean;
+    team_id?: string | null;
+    company?: string | null;
+    group_code?: string | null;
+    project_ids?: string[] | null;
+    created_at?: string;
+    updated_at?: string;
+  }): User {
+    return {
+      id: profile.id,
+      name: profile.name,
+      email: profile.email,
+      role: profile.role,
+      active: profile.active !== false,
+      teamId: profile.team_id || undefined,
+      company: profile.company || undefined,
+      groupCode: profile.group_code || undefined,
+      projectIds: profile.project_ids || [],
+      createdAt: profile.created_at,
+      updatedAt: profile.updated_at,
+    };
+  }
+
+  async loadAll(): Promise<User[]> {
+    if (!supabase) {
+      this.users = [];
+      return [];
+    }
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .order("name", { ascending: true });
+
+    if (error) throw new Error(error.message);
+
+    this.users = (data || []).map((item) =>
+      this._touchTeamMetadata(this._mapDbUser(item)),
+    );
+    return this.users;
   }
 
   async login(email: string, password: string): Promise<User> {
-    const demoUser =
-      this._findUserByEmail(email) || this._findDemoUserByEmail(email);
-    const demoPassword = DEMO_PASSWORDS[email];
-
-    if (demoUser && demoPassword === password) {
-      this._persistDemoUserIfMissing(demoUser);
-
-      if (demoUser.active === false) {
-        throw new Error("Esta conta encontra-se desativada.");
-      }
-
-      const userWithoutPassword = this._touchTeamMetadata({ ...demoUser });
-      delete userWithoutPassword.password;
-
-      if (typeof window !== "undefined") {
-        this._persistCurrentUser(userWithoutPassword);
-      }
-
-      return userWithoutPassword;
+    if (!supabase) {
+      throw new Error(
+        "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
     }
 
-    if (supabase) {
-      // Use Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error("Login failed");
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error("Login failed");
 
-      // Get user profile from database
-      const { data: profile, error: profileError } = await supabase
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", data.user.id)
+      .maybeSingle();
+
+    if (profileError) throw new Error(profileError.message);
+
+    let finalProfile = profile;
+    if (!finalProfile) {
+      const fallbackRole: UserRole =
+        email.toLowerCase() === ADMIN_EMAIL ? "admin" : "estagiario";
+
+      const { data: inserted, error: insertError } = await supabase
         .from("users")
+        .insert({
+          id: data.user.id,
+          name:
+            data.user.user_metadata?.name ||
+            email.split("@")[0] ||
+            "Utilizador",
+          email,
+          role: fallbackRole,
+          active: true,
+        })
         .select("*")
-        .eq("id", data.user.id)
         .single();
 
-      if (profileError) throw new Error(profileError.message);
-      return profile;
-    } else {
-      // Demo mode
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          const user = this.users.find((u) => u.email === email);
-          if (!user) {
-            reject(new Error("Email ou palavra-passe incorretos."));
-            return;
-          }
-          if (user.active === false) {
-            reject(new Error("Esta conta encontra-se desativada."));
-            return;
-          }
-          const storedPassword = DEMO_PASSWORDS[email];
-          if (storedPassword !== password) {
-            reject(new Error("Email ou palavra-passe incorretos."));
-            return;
-          }
-          const userWithoutPassword = this._touchTeamMetadata({ ...user });
-          delete userWithoutPassword.password;
-          if (typeof window === "undefined") {
-            resolve(userWithoutPassword);
-            return;
-          }
-          this._persistCurrentUser(userWithoutPassword);
-          resolve(userWithoutPassword);
-        }, 500);
-      });
+      if (insertError) throw new Error(insertError.message);
+      finalProfile = inserted;
     }
+
+    const mapped = this._touchTeamMetadata(this._mapDbUser(finalProfile));
+    this._upsertUserInCache(mapped);
+    this._persistCurrentUser(mapped);
+    return mapped;
   }
 
   async register(
@@ -192,63 +158,42 @@ class AuthService {
     password: string,
     role: UserRole,
   ): Promise<User> {
-    if (supabase) {
-      // Use Supabase
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error("Registration failed");
+    if (!supabase) {
+      throw new Error(
+        "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+    }
 
-      // Create user profile
-      const { data: profile, error: profileError } = await supabase
-        .from("users")
-        .insert({
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name },
+      },
+    });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error("Registration failed");
+
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .upsert(
+        {
           id: data.user.id,
           name,
           email,
           role,
           active: true,
-        })
-        .select()
-        .single();
+        },
+        { onConflict: "id" },
+      )
+      .select("*")
+      .single();
 
-      if (profileError) throw new Error(profileError.message);
-      return profile;
-    } else {
-      // Demo mode
-      return new Promise((resolve, reject) => {
-        setTimeout(() => {
-          if (this.users.find((u) => u.email === email)) {
-            reject(new Error("Este email já está registado."));
-            return;
-          }
-          if (password.length < 6) {
-            reject(
-              new Error("A palavra-passe deve ter pelo menos 6 caracteres."),
-            );
-            return;
-          }
-          const newUser: User = {
-            id: "u" + Date.now(),
-            name,
-            email,
-            role,
-            active: true,
-          };
-          this.users.push(newUser);
-          DEMO_PASSWORDS[email] = password;
-          this._saveUsersToStorage();
-          if (typeof window === "undefined") {
-            resolve(newUser);
-            return;
-          }
-          this._persistCurrentUser(newUser);
-          resolve(newUser);
-        }, 500);
-      });
-    }
+    if (profileError) throw new Error(profileError.message);
+    const mapped = this._touchTeamMetadata(this._mapDbUser(profile));
+    this._upsertUserInCache(mapped);
+    this._persistCurrentUser(mapped);
+    return mapped;
   }
 
   async createAccount(input: {
@@ -274,115 +219,90 @@ class AuthService {
       groupCode,
     } = input;
 
-    if (supabase) {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) throw new Error(error.message);
-      if (!data.user) throw new Error("Account creation failed");
+    if (!supabase) {
+      throw new Error(
+        "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
+    }
 
-      const { data: profile, error: profileError } = await supabase
-        .from("users")
-        .insert({
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name },
+      },
+    });
+    if (error) throw new Error(error.message);
+    if (!data.user) throw new Error("Account creation failed");
+
+    const { data: profile, error: profileError } = await supabase
+      .from("users")
+      .upsert(
+        {
           id: data.user.id,
           name,
           email,
           role,
           active,
-          team_id: teamId,
+          team_id: this._isUuid(teamId) ? teamId : null,
           project_ids: projectIds || [],
           company,
           group_code: groupCode,
-        })
-        .select()
-        .single();
+        },
+        { onConflict: "id" },
+      )
+      .select("*")
+      .single();
 
-      if (profileError) throw new Error(profileError.message);
-      return profile;
-    }
-
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (this.users.some((user) => user.email === email)) {
-          reject(new Error("Este email já está registado."));
-          return;
-        }
-
-        if (password.length < 6) {
-          reject(
-            new Error("A palavra-passe deve ter pelo menos 6 caracteres."),
-          );
-          return;
-        }
-
-        const newUser: User = {
-          id: `u${Date.now()}`,
-          name,
-          email,
-          role,
-          active,
-          teamId,
-          projectIds: projectIds || [],
-          company,
-          groupCode,
-          temporaryPassword: password,
-        };
-
-        this.users.push(newUser);
-        DEMO_PASSWORDS[email] = password;
-        this._saveUsersToStorage();
-        resolve(newUser);
-      }, 300);
-    });
+    if (profileError) throw new Error(profileError.message);
+    const mapped = this._touchTeamMetadata(this._mapDbUser(profile));
+    this._upsertUserInCache(mapped);
+    return mapped;
   }
 
   async logout(): Promise<void> {
-    if (supabase) {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw new Error(error.message);
-    }
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) throw new Error(error.message);
     if (typeof window === "undefined") return;
     localStorage.removeItem("estagio_current_user");
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
-    if (supabase) {
-      const { data, error } = await supabase
-        .from("users")
-        .update({
-          name: updates.name,
-          email: updates.email,
-          role: updates.role,
-          active: updates.active,
-          team_id: updates.teamId,
-          project_ids: updates.projectIds,
-          company: updates.company,
-          group_code: updates.groupCode,
-        })
-        .eq("id", id)
-        .select()
-        .single();
-
-      if (error) throw new Error(error.message);
-      return data;
+    if (!supabase) {
+      throw new Error(
+        "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      );
     }
 
-    const index = this.users.findIndex((user) => user.id === id);
-    if (index === -1) throw new Error("Utilizador não encontrado.");
+    const { data, error } = await supabase
+      .from("users")
+      .update({
+        name: updates.name,
+        email: updates.email,
+        role: updates.role,
+        active: updates.active,
+        team_id: updates.teamId
+          ? this._isUuid(updates.teamId)
+            ? updates.teamId
+            : null
+          : undefined,
+        project_ids: updates.projectIds,
+        company: updates.company,
+        group_code: updates.groupCode,
+      })
+      .eq("id", id)
+      .select("*")
+      .single();
 
-    const updated: User = {
-      ...this.users[index],
-      ...updates,
-      updatedAt: new Date().toISOString(),
-    };
-
-    this.users[index] = updated;
-    this._saveUsersToStorage();
+    if (error) throw new Error(error.message);
+    const mapped = this._touchTeamMetadata(this._mapDbUser(data));
+    this._upsertUserInCache(mapped);
 
     const current = this.getCurrentUser();
-    if (current?.id === id) {
-      this._persistCurrentUser(updated);
-    }
+    if (current?.id === id) this._persistCurrentUser(mapped);
 
-    return updated;
+    return mapped;
   }
 
   async toggleUserActive(id: string, active: boolean): Promise<User> {
@@ -406,17 +326,23 @@ class AuthService {
   }
 
   async resetPassword(id: string, password: string): Promise<User> {
-    const user = this.getById(id);
-    if (!user) throw new Error("Utilizador não encontrado.");
-    DEMO_PASSWORDS[user.email] = password;
-    return this.updateUser(id, { temporaryPassword: password });
+    void id;
+    void password;
+    throw new Error(
+      "A alteração de palavra-passe por admins requer chave service_role. Usa o script scripts/create-admin.mjs ou o painel Auth do Supabase.",
+    );
   }
 
   getCurrentUser(): User | null {
     if (typeof window === "undefined") return null;
     const stored = localStorage.getItem("estagio_current_user");
     if (stored) {
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored) as User;
+      if (!this._isUuid(parsed.id)) {
+        localStorage.removeItem("estagio_current_user");
+        return null;
+      }
+      return parsed;
     }
     return null;
   }
@@ -430,6 +356,7 @@ class AuthService {
   }
 
   getById(id: string): User | undefined {
+    if (!this._isUuid(id)) return undefined;
     const user = this.users.find((u) => u.id === id);
     return user ? this._touchTeamMetadata(user) : undefined;
   }
