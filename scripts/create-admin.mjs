@@ -1,11 +1,23 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function normalizeEnv(value, fallback = "") {
+  if (!value) return fallback;
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
 
-const adminEmail = process.env.ADMIN_EMAIL || "admin@estagio.pt";
-const adminPassword = process.env.ADMIN_PASSWORD;
-const adminName = process.env.ADMIN_NAME || "Administrador";
+const supabaseUrl = normalizeEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
+const serviceRoleKey = normalizeEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+const adminEmail = normalizeEnv(process.env.ADMIN_EMAIL, "admin@estagio.pt");
+const adminPassword = normalizeEnv(process.env.ADMIN_PASSWORD);
+const adminName = normalizeEnv(process.env.ADMIN_NAME, "Administrador");
 
 if (!supabaseUrl || !serviceRoleKey) {
   console.error(
@@ -63,7 +75,18 @@ async function resolveOrCreateAuthUser() {
     );
   }
 
-  return existing;
+  const updated = await supabase.auth.admin.updateUserById(existing.id, {
+    email: adminEmail,
+    password: adminPassword,
+    email_confirm: true,
+    user_metadata: { name: adminName },
+  });
+
+  if (updated.error || !updated.data.user) {
+    throw updated.error || new Error("Failed to reset existing admin user.");
+  }
+
+  return updated.data.user;
 }
 
 async function ensureAdminProfile(authUser) {
