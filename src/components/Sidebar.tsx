@@ -27,7 +27,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navItems = [
     { path: "/dashboard", label: "Dashboard", icon: "⊞" },
     { path: "/calendar", label: "Calendário", icon: "🗓" },
-    { path: "/activities", label: "As minhas atividades", icon: "📋" },
+    
     { path: "/register", label: "Registar horas", icon: "⏱" },
     ...(user.role === "admin"
       ? [
