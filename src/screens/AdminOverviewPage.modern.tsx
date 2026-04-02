@@ -31,6 +31,8 @@ const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "admin", label: "Admin" },
 ];
 
+type AccountWizardStep = 1 | 2;
+
 function createTempPassword(name: string): string {
   const firstName = name.split(" ")[0] || "user";
   return `${firstName.toLowerCase()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -48,7 +50,8 @@ export const AdminOverviewPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<"" | "active" | "inactive">(
     "",
   );
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState<AccountWizardStep>(1);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,6 +65,7 @@ export const AdminOverviewPage: React.FC = () => {
   const [formProjectIds, setFormProjectIds] = useState<string[]>([]);
   const [formActive, setFormActive] = useState(true);
   const [formNotes, setFormNotes] = useState("");
+  const [projectSearchTerm, setProjectSearchTerm] = useState("");
 
   const refreshData = async () => {
     const [loadedUsers, loadedProjects, loadedTeams, loadedActivities] =
@@ -95,8 +99,33 @@ export const AdminOverviewPage: React.FC = () => {
     if (selectedTeam) {
       setFormCompany(selectedTeam.company);
       setFormGroupCode(selectedTeam.groupCode);
+    } else {
+      setFormCompany("");
+      setFormGroupCode("");
     }
   }, [formTeamId, teams]);
+
+  const selectedTeam = useMemo(
+    () => teams.find((team) => team.id === formTeamId),
+    [formTeamId, teams],
+  );
+
+  const selectedProjects = useMemo(
+    () => projects.filter((project) => formProjectIds.includes(project.id)),
+    [formProjectIds, projects],
+  );
+
+  const filteredProjectOptions = useMemo(() => {
+    const term = projectSearchTerm.trim().toLowerCase();
+    return projects.filter((project) => {
+      if (!term) return true;
+      return (
+        project.name.toLowerCase().includes(term) ||
+        project.code.toLowerCase().includes(term) ||
+        (project.description || "").toLowerCase().includes(term)
+      );
+    });
+  }, [projectSearchTerm, projects]);
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
@@ -139,7 +168,7 @@ export const AdminOverviewPage: React.FC = () => {
   const inactiveAccounts = filteredUsers.filter(
     (user) => user.active === false,
   ).length;
-  const openModal = (user?: User) => {
+  const openWizard = (user?: User) => {
     if (user) {
       setEditingUserId(user.id);
       setFormName(user.name);
@@ -164,15 +193,48 @@ export const AdminOverviewPage: React.FC = () => {
       setFormProjectIds([]);
       setFormActive(true);
       setFormNotes("");
+      setProjectSearchTerm("");
     }
     setError(null);
     setSuccess(null);
-    setIsModalOpen(true);
+    setWizardStep(1);
+    setIsWizardOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
+  const closeWizard = () => {
+    setIsWizardOpen(false);
     setEditingUserId(null);
+    setWizardStep(1);
+    setProjectSearchTerm("");
+  };
+
+  const goBackToDetails = () => {
+    setError(null);
+    setWizardStep(1);
+  };
+
+  const validateStepOne = () => {
+    if (!formName.trim() || !formEmail.trim()) {
+      setError("Preenche o nome e o email do utilizador.");
+      return false;
+    }
+
+    if (!editingUserId && !formPassword.trim()) {
+      setFormPassword(createTempPassword(formName));
+    }
+
+    return true;
+  };
+
+  const goToAssignmentStep = (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+
+    if (!validateStepOne()) {
+      return;
+    }
+
+    setWizardStep(2);
   };
 
   const toggleProject = (projectId: string) => {
@@ -183,12 +245,23 @@ export const AdminOverviewPage: React.FC = () => {
     );
   };
 
+  const removeProject = (projectId: string) => {
+    setFormProjectIds((current) =>
+      current.filter((item) => item !== projectId),
+    );
+  };
+
   const saveUser = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
 
     if (!formName.trim() || !formEmail.trim()) {
       setError("Preenche o nome e o email do utilizador.");
+      return;
+    }
+
+    if (!editingUserId && !formTeamId) {
+      setError("Seleciona uma equipa para criar a conta.");
       return;
     }
 
@@ -249,7 +322,7 @@ export const AdminOverviewPage: React.FC = () => {
       );
       await refreshData();
       setTimeout(() => {
-        closeModal();
+        closeWizard();
         setSuccess(null);
       }, 1200);
     } catch (err) {
@@ -305,7 +378,7 @@ export const AdminOverviewPage: React.FC = () => {
           <CardHeader className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <CardTitle>Gestão de contas</CardTitle>
             <div className="flex flex-wrap gap-2">
-              <Button onClick={() => openModal()} size="sm">
+              <Button onClick={() => openWizard()} size="sm">
                 Nova conta
               </Button>
               <Button variant="secondary" size="sm" onClick={refreshData}>
@@ -449,7 +522,7 @@ export const AdminOverviewPage: React.FC = () => {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => openModal(member)}
+                      onClick={() => openWizard(member)}
                     >
                       Editar
                     </Button>
@@ -507,155 +580,279 @@ export const AdminOverviewPage: React.FC = () => {
       </div>
 
       <Modal
-        isOpen={isModalOpen}
-        onClose={closeModal}
+        isOpen={isWizardOpen && wizardStep === 1}
+        onClose={closeWizard}
         title={editingUserId ? "Editar conta" : "Criar conta de estagiário"}
         footer={
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={closeModal}>
+            <Button variant="secondary" onClick={closeWizard}>
               Cancelar
             </Button>
+            <Button onClick={goToAssignmentStep}>Seguinte</Button>
+          </div>
+        }
+      >
+        <form onSubmit={goToAssignmentStep} className="space-y-4">
+          <div className="space-y-3 border-b border-slate-200 pb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-navy">
+                Dados essenciais
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Preenche os dados principais antes de avançar.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Nome completo
+                </label>
+                <input
+                  value={formName}
+                  onChange={(event) => setFormName(event.target.value)}
+                  placeholder="Ex: João Silva"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={formEmail}
+                  onChange={(event) => setFormEmail(event.target.value)}
+                  placeholder="Ex: joao@empresa.pt"
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Password temporária
+                  </label>
+                  <input
+                    value={formPassword}
+                    onChange={(event) => setFormPassword(event.target.value)}
+                    placeholder="Gerada automaticamente"
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Papel / perfil do utilizador
+                  </label>
+                  <select
+                    value={formRole}
+                    onChange={(event) =>
+                      setFormRole(event.target.value as UserRole)
+                    }
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors focus:border-primary-500 focus:outline-none"
+                  >
+                    {ROLE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <div className="text-sm font-medium text-navy">
+                    Conta ativa
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Permite login e acesso
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormActive((current) => !current)}
+                  className={`relative inline-flex h-6 w-12 items-center rounded-full transition ${
+                    formActive ? "bg-primary-500" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                      formActive ? "translate-x-7" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        isOpen={isWizardOpen && wizardStep === 2}
+        onClose={closeWizard}
+        title={editingUserId ? "Editar conta" : "Criar conta de estagiário"}
+        footer={
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={goBackToDetails}>
+              Voltar
+            </Button>
             <Button onClick={saveUser}>
-              {editingUserId ? "Guardar" : "Criar"}
+              {editingUserId ? "Guardar" : "Criar conta"}
             </Button>
           </div>
         }
       >
-        <form onSubmit={saveUser} className="space-y-5">
-          <div className="space-y-4 border-b border-slate-200 pb-4">
-            <h3 className="text-sm font-semibold text-navy">Dados pessoais</h3>
-            <Input
-              label="Nome completo"
-              value={formName}
-              onChange={(event) => setFormName(event.target.value)}
-              placeholder="Ex: João Silva"
-              required
-            />
-            <Input
-              label="Email"
-              type="email"
-              value={formEmail}
-              onChange={(event) => setFormEmail(event.target.value)}
-              placeholder="Ex: joao@empresa.pt"
-              required
-            />
-            <Input
-              label="Password temporária"
-              value={formPassword}
-              onChange={(event) => setFormPassword(event.target.value)}
-              placeholder="Deixar vazio para gerar automaticamente"
-            />
-          </div>
+        <form onSubmit={saveUser} className="space-y-4">
+          <div className="space-y-3 border-b border-slate-200 pb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-navy">Atribuição</h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Define a equipa e associa os projetos da conta.
+              </p>
+            </div>
 
-          <div className="space-y-4 border-b border-slate-200 pb-4">
-            <h3 className="text-sm font-semibold text-navy">Perfil e acesso</h3>
-            <Select
-              label="Perfil / Papel"
-              value={formRole}
-              onChange={(event) => setFormRole(event.target.value as UserRole)}
-              options={ROLE_OPTIONS}
-            />
-            <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-              <div>
-                <div className="text-sm font-medium text-navy">Conta ativa</div>
-                <div className="text-xs text-slate-500">
-                  Permite login e acesso
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Equipa
+              </label>
+              <select
+                value={formTeamId}
+                onChange={(event) => setFormTeamId(event.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors focus:border-primary-500 focus:outline-none"
+              >
+                <option value="">Seleciona uma opção</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedTeam ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Empresa
+                  </label>
+                  <input
+                    value={formCompany}
+                    readOnly
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">
+                    Código / grupo
+                  </label>
+                  <input
+                    value={formGroupCode}
+                    readOnly
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
+                  />
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setFormActive((current) => !current)}
-                className={`relative inline-flex h-6 w-12 items-center rounded-full transition ${
-                  formActive ? "bg-primary-500" : "bg-slate-300"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                    formActive ? "translate-x-7" : "translate-x-1"
-                  }`}
-                />
-              </button>
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                Escolhe uma equipa para mostrar a empresa e o código/grupo.
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-sm font-semibold text-navy">
+                Projetos atribuídos
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Pesquisa, seleciona e remove projetos sem listas longas.
+              </p>
             </div>
-          </div>
 
-          <div className="space-y-4 border-b border-slate-200 pb-4">
-            <h3 className="text-sm font-semibold text-navy">
-              Atribuição à equipa
-            </h3>
-            <Select
-              label="Equipa"
-              value={formTeamId}
-              onChange={(event) => setFormTeamId(event.target.value)}
-              options={teams.map((team) => ({
-                value: team.id,
-                label: team.name,
-              }))}
-            />
-            <Input
-              label="Empresa"
-              value={formCompany}
-              onChange={(event) => setFormCompany(event.target.value)}
-              placeholder="Auto-preenchido pela equipa"
-              disabled
-            />
-            <Input
-              label="Código / Grupo"
-              value={formGroupCode}
-              onChange={(event) => setFormGroupCode(event.target.value)}
-              placeholder="Auto-preenchido pela equipa"
-              disabled
-            />
-          </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Procurar projeto
+              </label>
+              <input
+                value={projectSearchTerm}
+                onChange={(event) => setProjectSearchTerm(event.target.value)}
+                placeholder="Escreve para filtrar projetos..."
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
+              />
 
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-navy">
-              Projetos atribuídos
-            </h3>
-            <div className="grid gap-2">
-              {projects.length === 0 ? (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-500">
-                  Nenhum projeto disponível
+              {selectedProjects.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedProjects.map((project) => (
+                    <button
+                      key={project.id}
+                      type="button"
+                      onClick={() => removeProject(project.id)}
+                      className="inline-flex items-center gap-2 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 transition hover:bg-primary-100"
+                    >
+                      <span>{project.name}</span>
+                      <span className="text-primary-500">×</span>
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                projects.map((project) => (
-                  <button
-                    key={project.id}
-                    type="button"
-                    onClick={() => toggleProject(project.id)}
-                    className={`rounded-lg border px-4 py-3 text-left text-sm transition ${
-                      formProjectIds.includes(project.id)
-                        ? "border-primary-500 bg-primary-50 text-primary-700"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium">{project.name}</div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {project.code}
-                        </div>
-                      </div>
-                      <div
-                        className={`inline-block h-5 w-5 rounded border-2 transition ${
-                          formProjectIds.includes(project.id)
-                            ? "border-primary-500 bg-primary-500"
-                            : "border-slate-300"
-                        }`}
-                      />
-                    </div>
-                  </button>
-                ))
               )}
-            </div>
-          </div>
 
-          <Textarea
-            label="Notas internas"
-            value={formNotes}
-            onChange={(event) => setFormNotes(event.target.value)}
-            placeholder="Observações internas sobre a conta (visível apenas a admins)"
-            rows={3}
-          />
+              <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+                {filteredProjectOptions.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                    Nenhum projeto encontrado.
+                  </div>
+                ) : (
+                  filteredProjectOptions.map((project) => {
+                    const isSelected = formProjectIds.includes(project.id);
+                    return (
+                      <button
+                        key={project.id}
+                        type="button"
+                        onClick={() => toggleProject(project.id)}
+                        className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition ${
+                          isSelected
+                            ? "border-primary-500 bg-primary-50 text-primary-700"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="min-w-0">
+                          <div className="font-medium">{project.name}</div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {project.code}
+                            {project.description
+                              ? ` · ${project.description}`
+                              : ""}
+                          </div>
+                        </div>
+                        <div
+                          className={`ml-3 inline-flex h-5 w-5 items-center justify-center rounded border-2 text-[11px] transition ${
+                            isSelected
+                              ? "border-primary-500 bg-primary-500 text-white"
+                              : "border-slate-300 text-transparent"
+                          }`}
+                        >
+                          ✓
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            <Textarea
+              label="Notas internas"
+              value={formNotes}
+              onChange={(event) => setFormNotes(event.target.value)}
+              placeholder="Observações internas sobre a conta (visível apenas a admins)"
+              rows={3}
+            />
+          </div>
         </form>
       </Modal>
     </>

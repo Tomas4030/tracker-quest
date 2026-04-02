@@ -1,4 +1,4 @@
-# EstágioTrack
+# Davinci Board
 
 Aplicação moderna de gestão de atividades em estágio, desenvolvida com Next.js, React, TypeScript, Tailwind CSS e Supabase.
 
@@ -164,6 +164,16 @@ No PowerShell:
 $env:ADMIN_EMAIL="admin@estagio.pt"; $env:ADMIN_PASSWORD="<PASSWORD_FORTE>"; npm run create:admin
 ```
 
+### Seed de dados de programação
+
+Se quiseres preencher a base de dados com equipas, projetos, utilizadores e atividades ligados a programação:
+
+```bash
+npm run seed:programming
+```
+
+O seed é idempotente, por isso podes corrê-lo várias vezes sem criar duplicados.
+
 ### Passo 4: Atualizar Serviço de Autenticação
 
 Se usares Supabase Auth com SSO, atualiza `src/services/authService.ts` para usar o Supabase diretamente.
@@ -265,7 +275,7 @@ NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL_HERE
 NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY_HERE
 
 # App Configuration
-NEXT_PUBLIC_APP_NAME=EstágioTrack
+NEXT_PUBLIC_APP_NAME=Davinci Board
 ```
 
 ## 🐛 Troubleshooting

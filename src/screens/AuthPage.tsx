@@ -33,7 +33,7 @@ export const AuthPage: React.FC = () => {
             📋
           </div>
           <div>
-            <div className="font-semibold text-navy">EstágioTrack</div>
+            <div className="font-semibold text-navy">Davinci Board</div>
             <div className="text-xs text-slate-600">Gestão de atividades</div>
           </div>
         </div>

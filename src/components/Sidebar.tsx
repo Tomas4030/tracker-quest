@@ -71,7 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             📋
           </div>
           <div>
-            <div className="font-semibold">EstágioTrack</div>
+            <div className="font-semibold">Davinci Board</div>
             <div className="text-xs text-white/40">Gestão de Activities</div>
           </div>
         </div>

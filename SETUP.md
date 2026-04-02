@@ -1,4 +1,4 @@
-# Setup - EstágioTrack
+# Setup - Davinci Board
 
 Guia de configuração da aplicação com Next.js e Supabase.
 
@@ -26,7 +26,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 GROUP_API_KEY=
-NEXT_PUBLIC_APP_NAME=EstágioTrack
+NEXT_PUBLIC_APP_NAME=Davinci Board
 ```
 
 ## Supabase

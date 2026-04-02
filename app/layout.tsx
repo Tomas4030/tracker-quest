@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "../src/index.css";
 
 export const metadata: Metadata = {
-  title: "EstágioTrack",
+  title: "Davinci Board",
   description: "Gestão de atividades em estágio",
 };
 

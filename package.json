@@ -2,14 +2,15 @@
   "name": "estagio-track",
   "private": true,
   "version": "1.0.0",
-  "description": "EstágioTrack - Aplicação moderna de gestão de atividades em estágio",
+  "description": "Davinci Board - Aplicação moderna de gestão de atividades em estágio",
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "create:admin": "node scripts/create-admin.mjs"
+    "create:admin": "node scripts/create-admin.mjs",
+    "seed:programming": "node scripts/seed-programming-data.mjs"
   },
   "dependencies": {
     "next": "^14.2.30",
