@@ -22,7 +22,7 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({
   const hours = calculateHours(activity.startTime, activity.endTime);
 
   return (
-    <div className="flex gap-4 p-4 border-b border-slate-200 hover:bg-slate-50 transition-colors last:border-b-0">
+    <div className="group flex gap-4 border-b border-slate-200 p-4 transition-colors last:border-b-0 hover:bg-slate-50">
       {/* Time */}
       <div className="min-w-fit text-xs font-mono text-slate-500">
         <div>{activity.date}</div>
@@ -40,6 +40,11 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({
         <div className="font-medium text-slate-900 text-sm">
           {activity.title}
         </div>
+        {activity.projectName && (
+          <div className="mt-0.5 text-[11px] uppercase tracking-[0.16em] text-slate-500">
+            {activity.projectName}
+          </div>
+        )}
         {activity.description && (
           <div className="text-xs text-slate-600 mt-1 line-clamp-2">
             {activity.description}
@@ -62,7 +67,7 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({
 
       {/* Actions */}
       {(onEdit || onDelete) && (
-        <div className="flex gap-1 opacity-0 hover:opacity-100 transition-opacity">
+        <div className="flex gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
           {onEdit && (
             <button
               onClick={() => onEdit(activity.id)}

@@ -13,3 +13,5 @@ export { Topbar } from "./Topbar";
 export { EmptyState } from "./EmptyState";
 export { Select } from "./Select";
 export { Textarea } from "./Textarea";
+export { InsightCard } from "./InsightCard";
+export { CalendarBoard } from "./CalendarBoard";

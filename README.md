@@ -6,11 +6,12 @@ Aplicação moderna de gestão de atividades em estágio, desenvolvida com Next.
 
 - ✅ **Autenticação**: Login e registo de utilizadores
 - ✅ **Dashboard**: Visualização de estatísticas e atividades recentes
+- ✅ **Calendário**: Vista por dia, semana e mês com blocos de atividade
 - ✅ **Registo de Atividades**: Criar, editar e eliminar atividades
 - ✅ **Filtros e Pesquisa**: Filtrar por data e pesquisar atividades
-- ✅ **Painel Admin**: Gerir todos os estagiários e atividades
-- ✅ **Relatórios**: Estatísticas e produtividade por estagiário
-- ✅ **Design Responsivo**: Funciona em desktop, tablet e móvel
+- ✅ **Painel Admin**: Gerir contas, equipas, projetos e atividades
+- ✅ **Relatórios AI**: Relatórios inteligentes com fallback local
+- ✅ **Design Mobile-First**: Funciona em desktop, tablet e móvel
 - ✅ **Modo Demo**: Dados armazenados em localStorage
 
 ## 🛠️ Stack Tecnológico
@@ -19,6 +20,7 @@ Aplicação moderna de gestão de atividades em estágio, desenvolvida com Next.
 - **Estado**: Zustand
 - **Roteamento**: Next.js App Router
 - **Backend**: Supabase (PostgreSQL + Auth)
+- **AI**: Group API via rota server-side
 - **Desenvolvimento**: Next.js
 - **Ícones**: Lucide React
 
@@ -124,45 +126,32 @@ A aplicação vem com dados de demo pré-carregados:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `GROUP_API_KEY`
 
 ### Passo 2: Criar Tabelas
 
-Execute o seguinte SQL no console do Supabase:
+Nao uses `CREATE TABLE` simples se a base ja existe, porque vai dar erro como:
+`ERROR: relation "users" already exists`.
+
+Usa o script idempotente do projeto:
+
+- `supabase/safe_schema.sql`
+
+Esse script pode ser corrido varias vezes sem erro porque usa:
+
+- `create table if not exists`
+- `alter table ... add column if not exists`
+- `create index if not exists`
+- `drop policy if exists` antes de `create policy`
+
+Resumo rapido:
 
 ```sql
--- Tabela de utilizadores
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  name TEXT NOT NULL,
-  email TEXT UNIQUE NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'estagiario')),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Tabela de atividades
-CREATE TABLE activities (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  title TEXT NOT NULL,
-  description TEXT,
-  date DATE NOT NULL,
-  start_time TIME NOT NULL,
-  end_time TIME NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('em-curso', 'concluido', 'pendente')),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Índices
-CREATE INDEX activities_user_id_idx ON activities(user_id);
-CREATE INDEX activities_date_idx ON activities(date);
-
--- Row Level Security
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
-
--- Políticas RLS (opcional - configurar conforme necessário)
+create table if not exists ...;
+alter table ... add column if not exists ...;
+create index if not exists ...;
+drop policy if exists ...;
+create policy ...;
 ```
 
 ### Passo 3: Configurar .env.local

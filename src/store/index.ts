@@ -7,12 +7,6 @@ interface AppStore {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (
-    name: string,
-    email: string,
-    password: string,
-    role: "admin" | "estagiario",
-  ) => Promise<void>;
   logout: () => void;
   setUser: (user: User | null) => void;
 
@@ -36,22 +30,6 @@ export const useAppStore = create<AppStore>((set) => ({
     set({ isLoading: true });
     try {
       const user = await authService.login(email, password);
-      set({ user, isLoading: false });
-    } catch (error) {
-      set({ isLoading: false });
-      throw error;
-    }
-  },
-
-  register: async (
-    name: string,
-    email: string,
-    password: string,
-    role: "admin" | "estagiario",
-  ) => {
-    set({ isLoading: true });
-    try {
-      const user = await authService.register(name, email, password, role);
       set({ user, isLoading: false });
     } catch (error) {
       set({ isLoading: false });

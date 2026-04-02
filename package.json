@@ -3,11 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "description": "EstágioTrack - Aplicação moderna de gestão de atividades em estágio",
-  "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 3001",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },

@@ -24,10 +24,11 @@ Copia `.env.local.example` para `.env.local` e ajusta os valores:
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+GROUP_API_KEY=
 NEXT_PUBLIC_APP_NAME=EstágioTrack
 ```
 
-Se deixares as variáveis vazias, a aplicação corre em modo demo com `localStorage`.
+Se deixares as variáveis vazias, a aplicação corre em modo demo com `localStorage` e o relatório inteligente usa o fallback local.
 
 ## Supabase
 
@@ -38,31 +39,34 @@ Se deixares as variáveis vazias, a aplicação corre em modo demo com `localSto
 
 ## Tabelas
 
-Executa este SQL no Supabase:
+Para evitar erros como `relation "users" already exists`, usa o script seguro abaixo.
+Ele pode ser corrido várias vezes sem rebentar em tabelas/índices/policies já existentes.
+
+1. Abre o SQL Editor no Supabase
+2. Cola o conteúdo de `supabase/safe_schema.sql`
+3. Executa
+
+Script principal: `supabase/safe_schema.sql`
+
+Resumo do que ele faz:
 
 ```sql
-create table if not exists users (
-  id uuid primary key,
-  name text not null,
-  email text unique not null,
-  role text not null check (role in ('admin', 'estagiario')),
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-
-create table if not exists activities (
-  id uuid primary key,
-  user_id uuid not null references users(id) on delete cascade,
-  title text not null,
-  description text,
-  date date not null,
-  start_time time not null,
-  end_time time not null,
-  status text not null check (status in ('em-curso', 'concluido', 'pendente')),
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
+create table if not exists ...;
+alter table ... add column if not exists ...;
+create index if not exists ...;
+drop policy if exists ...;
+create policy ...;
 ```
+
+### Rota AI
+
+O relatório inteligente usa `app/api/reports/group/route.ts`.
+
+- `GROUP_API_KEY`: chave de autenticação da API
+
+Nota: o endpoint da Group API está fixo no backend da app; só precisas de configurar a key.
+
+Se estas variáveis não existirem, a app gera o relatório com analytics local para não bloquear a utilização.
 
 ## Build
 

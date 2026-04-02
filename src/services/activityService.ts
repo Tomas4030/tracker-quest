@@ -1,90 +1,6 @@
 import type { Activity, ActivityFilter } from "@/types";
 import { supabase } from "./supabase";
 
-const DEMO_ACTIVITIES: Activity[] = [
-  {
-    id: "a1",
-    userId: "u2",
-    title: "Desenvolvimento da Aplicação X",
-    description:
-      "Implementação do módulo de autenticação e sessões de utilizador.",
-    date: "2024-04-15",
-    startTime: "09:00",
-    endTime: "13:00",
-    status: "concluido",
-  },
-  {
-    id: "a2",
-    userId: "u2",
-    title: "Base de Dados Y",
-    description: "Criação do schema e migração de dados para PostgreSQL.",
-    date: "2024-04-15",
-    startTime: "14:30",
-    endTime: "18:30",
-    status: "concluido",
-  },
-  {
-    id: "a3",
-    userId: "u2",
-    title: "Reunião de Equipa",
-    description: "Discussão do andamento do projeto e próximas tarefas.",
-    date: "2024-04-17",
-    startTime: "09:00",
-    endTime: "10:00",
-    status: "concluido",
-  },
-  {
-    id: "a4",
-    userId: "u2",
-    title: "Desenvolvimento da Aplicação X",
-    description: "Desenvolvimento da interface do painel de controlo.",
-    date: "2024-04-17",
-    startTime: "14:30",
-    endTime: "18:30",
-    status: "em-curso",
-  },
-  {
-    id: "a5",
-    userId: "u3",
-    title: "Testes e Validações",
-    description: "Testes de unidade para os módulos de autenticação.",
-    date: "2024-04-16",
-    startTime: "11:00",
-    endTime: "13:00",
-    status: "concluido",
-  },
-  {
-    id: "a6",
-    userId: "u3",
-    title: "Ajustes na Interface",
-    description: "Correção de bugs de responsividade no frontend.",
-    date: "2024-04-17",
-    startTime: "13:00",
-    endTime: "17:00",
-    status: "concluido",
-  },
-  {
-    id: "a7",
-    userId: "u2",
-    title: "Desenvolvimento da Aplicação X",
-    description: "Integração com API externa de pagamentos.",
-    date: "2024-04-18",
-    startTime: "09:00",
-    endTime: "13:00",
-    status: "pendente",
-  },
-  {
-    id: "a8",
-    userId: "u3",
-    title: "Documentação técnica",
-    description: "Redação da documentação da API REST.",
-    date: "2024-04-18",
-    startTime: "09:00",
-    endTime: "12:00",
-    status: "em-curso",
-  },
-];
-
 class ActivityService {
   private activities: Activity[] = [];
 
@@ -94,7 +10,7 @@ class ActivityService {
 
   private _loadActivitiesFromStorage() {
     if (typeof window === "undefined") {
-      this.activities = DEMO_ACTIVITIES;
+      this.activities = [];
       return;
     }
 
@@ -102,7 +18,7 @@ class ActivityService {
     if (stored) {
       this.activities = JSON.parse(stored);
     } else {
-      this.activities = DEMO_ACTIVITIES;
+      this.activities = [];
       this._saveActivitiesToStorage();
     }
   }
@@ -120,6 +36,8 @@ class ActivityService {
         .from("activities")
         .insert({
           user_id: activity.userId,
+          project_id: activity.projectId,
+          project_name: activity.projectName,
           title: activity.title,
           description: activity.description,
           date: activity.date,
@@ -134,6 +52,8 @@ class ActivityService {
       return {
         id: data.id,
         userId: data.user_id,
+        projectId: data.project_id,
+        projectName: data.project_name,
         title: data.title,
         description: data.description,
         date: data.date,
@@ -164,6 +84,8 @@ class ActivityService {
         .update({
           title: updates.title,
           description: updates.description,
+          project_id: updates.projectId,
+          project_name: updates.projectName,
           date: updates.date,
           start_time: updates.startTime,
           end_time: updates.endTime,
@@ -177,6 +99,8 @@ class ActivityService {
       return {
         id: data.id,
         userId: data.user_id,
+        projectId: data.project_id,
+        projectName: data.project_name,
         title: data.title,
         description: data.description,
         date: data.date,
@@ -223,6 +147,8 @@ class ActivityService {
       return {
         id: data.id,
         userId: data.user_id,
+        projectId: data.project_id,
+        projectName: data.project_name,
         title: data.title,
         description: data.description,
         date: data.date,
@@ -241,6 +167,13 @@ class ActivityService {
 
     if (filter?.userId) {
       filtered = filtered.filter((a) => a.userId === filter.userId);
+    }
+    if (filter?.projectId) {
+      filtered = filtered.filter(
+        (a) =>
+          a.projectId === filter.projectId ||
+          a.projectName === filter.projectId,
+      );
     }
     if (filter?.date) {
       filtered = filtered.filter((a) => a.date === filter.date);
