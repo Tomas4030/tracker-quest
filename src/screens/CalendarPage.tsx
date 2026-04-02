@@ -13,6 +13,7 @@ import {
   Input,
   InsightCard,
   Modal,
+  Pagination,
   Select,
   Textarea,
   Topbar,
@@ -70,6 +71,7 @@ export const CalendarPage: React.FC = () => {
   const [view, setView] = useState<CalendarViewMode>("month");
   const [referenceDate, setReferenceDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(getTodayString());
+  const [dayActivityPage, setDayActivityPage] = useState(1);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
     null,
   );
@@ -114,6 +116,11 @@ export const CalendarPage: React.FC = () => {
       setProjects([]);
     });
   }, [user, loadActivities]);
+
+  // Reset pagination when date changes
+  useEffect(() => {
+    setDayActivityPage(1);
+  }, [selectedDate]);
 
   const visibleActivities = useMemo(() => {
     return activities.filter((activity) => {
@@ -163,6 +170,16 @@ export const CalendarPage: React.FC = () => {
     (total, activity) =>
       total + calculateHours(activity.startTime, activity.endTime),
     0,
+  );
+
+  // Pagination for day activities (4 per page)
+  const ACTIVITIES_PER_PAGE = 4;
+  const totalDayActivityPages = Math.ceil(
+    selectedDayActivities.length / ACTIVITIES_PER_PAGE,
+  );
+  const paginatedDayActivities = selectedDayActivities.slice(
+    (dayActivityPage - 1) * ACTIVITIES_PER_PAGE,
+    dayActivityPage * ACTIVITIES_PER_PAGE,
   );
 
   const handleOpenModal = (activity?: Activity, dateKey?: string) => {
@@ -282,7 +299,7 @@ export const CalendarPage: React.FC = () => {
       <Topbar title="Calendário de atividades" date={formatDate(new Date())} />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Card>
+          <Card className="flex min-h-[100px] flex-col">
             <CardBody>
               <div className="text-sm text-slate-500">Total visível</div>
               <div className="mt-2 text-2xl font-semibold text-navy">
@@ -431,79 +448,91 @@ export const CalendarPage: React.FC = () => {
           onCreateActivity={(dateKey) => handleOpenModal(undefined, dateKey)}
         />
 
-        <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-          <Card>
+        <div className="grid items-start gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+          <Card className="">
             <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <CardTitle>Atividades do dia</CardTitle>
               <div className="text-sm text-slate-500">
                 {formatDate(`${selectedDate}T00:00:00`)}
               </div>
             </CardHeader>
-            <CardBody className="p-0">
+            <CardBody className="flex flex-1 flex-col p-0 ">
               {selectedDayActivities.length === 0 ? (
-                <div className="p-6 text-sm text-slate-500">
+                <div className="flex flex-1 items-center p-6 text-sm text-slate-500">
                   Nenhuma atividade para a data selecionada.
                 </div>
               ) : (
-                <div className="divide-y divide-slate-200">
-                  {selectedDayActivities.map((activity) => {
-                    const project = projects.find(
-                      (item) => item.id === activity.projectId,
-                    );
-                    const author = users.find(
-                      (item) => item.id === activity.userId,
-                    );
-                    return (
-                      <div key={activity.id} className="p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-semibold text-navy">
-                              {activity.title}
+                <>
+                  <div className="flex-1 divide-y divide-slate-200">
+                    {paginatedDayActivities.map((activity) => {
+                      const project = projects.find(
+                        (item) => item.id === activity.projectId,
+                      );
+                      const author = users.find(
+                        (item) => item.id === activity.userId,
+                      );
+                      return (
+                        <div key={activity.id} className="p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-navy">
+                                {activity.title}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                {author?.name || "Sem utilizador"} ·{" "}
+                                {project?.name ||
+                                  activity.projectName ||
+                                  "Sem projeto"}
+                              </div>
                             </div>
-                            <div className="mt-1 text-xs text-slate-500">
-                              {author?.name || "Sem utilizador"} ·{" "}
-                              {project?.name ||
-                                activity.projectName ||
-                                "Sem projeto"}
+                            <div className="flex items-center gap-2">
+                              <Badge status={activity.status} />
+                              <span className="text-xs font-mono text-slate-500">
+                                {formatHours(
+                                  calculateHours(
+                                    activity.startTime,
+                                    activity.endTime,
+                                  ),
+                                )}
+                              </span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge status={activity.status} />
-                            <span className="text-xs font-mono text-slate-500">
-                              {formatHours(
-                                calculateHours(
-                                  activity.startTime,
-                                  activity.endTime,
-                                ),
-                              )}
-                            </span>
+                          {activity.description && (
+                            <p className="mt-3 text-sm leading-6 text-slate-600">
+                              {activity.description}
+                            </p>
+                          )}
+                          <div className="mt-4 flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleOpenModal(activity)}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="danger"
+                              onClick={() => handleDelete(activity.id)}
+                            >
+                              Apagar
+                            </Button>
                           </div>
                         </div>
-                        {activity.description && (
-                          <p className="mt-3 text-sm leading-6 text-slate-600">
-                            {activity.description}
-                          </p>
-                        )}
-                        <div className="mt-4 flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleOpenModal(activity)}
-                          >
-                            Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="danger"
-                            onClick={() => handleDelete(activity.id)}
-                          >
-                            Apagar
-                          </Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                  {totalDayActivityPages > 1 && (
+                    <div className="mt-auto border-t border-slate-200 p-4">
+                      <Pagination
+                        currentPage={dayActivityPage}
+                        totalPages={totalDayActivityPages}
+                        onPageChange={setDayActivityPage}
+                        className="justify-center"
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </CardBody>
           </Card>

@@ -15,3 +15,4 @@ export { Select } from "./Select";
 export { Textarea } from "./Textarea";
 export { InsightCard } from "./InsightCard";
 export { CalendarBoard } from "./CalendarBoard";
+export { Pagination } from "./Pagination";

@@ -10,6 +10,7 @@ import {
   CardTitle,
   EmptyState,
   InsightCard,
+  Pagination,
   StatCard,
   Topbar,
 } from "@/components";
@@ -28,6 +29,8 @@ export const DashboardPage: React.FC = () => {
   const { user, activities, loadActivities } = useAppStore();
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [recentActivitiesPage, setRecentActivitiesPage] = useState(1);
+  const [difficultiesPage, setDifficultiesPage] = useState(1);
 
   useEffect(() => {
     if (!user) return;
@@ -74,12 +77,30 @@ export const DashboardPage: React.FC = () => {
 
   const weekDates = getWeekDates();
   const today = new Date().toISOString().split("T")[0];
-  const recentActivities = [...scopedActivities]
-    .sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime),
-    )
-    .slice(0, 6);
+  const allRecentActivities = [...scopedActivities].sort(
+    (a, b) =>
+      b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime),
+  );
+
+  // Pagination for recent activities (6 per page)
+  const RECENT_ACTIVITIES_PER_PAGE = 6;
+  const totalRecentActivityPages = Math.ceil(
+    allRecentActivities.length / RECENT_ACTIVITIES_PER_PAGE,
+  );
+  const recentActivities = allRecentActivities.slice(
+    (recentActivitiesPage - 1) * RECENT_ACTIVITIES_PER_PAGE,
+    recentActivitiesPage * RECENT_ACTIVITIES_PER_PAGE,
+  );
+
+  // Pagination for difficulties (6 per page)
+  const DIFFICULTIES_PER_PAGE = 6;
+  const totalDifficultiesPages = Math.ceil(
+    report.difficulties.length / DIFFICULTIES_PER_PAGE,
+  );
+  const paginatedDifficulties = report.difficulties.slice(
+    (difficultiesPage - 1) * DIFFICULTIES_PER_PAGE,
+    difficultiesPage * DIFFICULTIES_PER_PAGE,
+  );
   const todayHours = scopedActivities
     .filter((activity) => activity.date === today)
     .reduce(
@@ -217,7 +238,7 @@ export const DashboardPage: React.FC = () => {
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-          <Card>
+          <Card className="flex min-h-[460px] flex-col">
             <CardHeader className="flex items-center justify-between gap-3">
               <CardTitle>Produtividade semanal</CardTitle>
               <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
@@ -278,62 +299,88 @@ export const DashboardPage: React.FC = () => {
                 Ver calendário
               </Link>
             </CardHeader>
-            <CardBody className="p-0">
+            <CardBody className="flex flex-1 flex-col p-0">
               {recentActivities.length === 0 ? (
-                <div className="p-6">
+                <div className="flex flex-1 items-center p-6">
                   <EmptyState
                     title="Sem atividades"
                     description="Começa a registar tarefas para preencher o dashboard com dados úteis."
                   />
                 </div>
               ) : (
-                <div>
-                  {recentActivities.map((activity) => {
-                    const actUser = users.find(
-                      (item) => item.id === activity.userId,
-                    );
-                    return (
-                      <ActivityItem
-                        key={activity.id}
-                        activity={activity}
-                        showUser={user.role === "admin"}
-                        userName={actUser?.name}
+                <>
+                  <div className="flex-1">
+                    {recentActivities.map((activity) => {
+                      const actUser = users.find(
+                        (item) => item.id === activity.userId,
+                      );
+                      return (
+                        <ActivityItem
+                          key={activity.id}
+                          activity={activity}
+                          showUser={user.role === "admin"}
+                          userName={actUser?.name}
+                        />
+                      );
+                    })}
+                  </div>
+                  {totalRecentActivityPages > 1 && (
+                    <div className="mt-auto border-t border-slate-200 p-4">
+                      <Pagination
+                        currentPage={recentActivitiesPage}
+                        totalPages={totalRecentActivityPages}
+                        onPageChange={setRecentActivitiesPage}
+                        className="justify-center"
                       />
-                    );
-                  })}
-                </div>
+                    </div>
+                  )}
+                </>
               )}
             </CardBody>
           </Card>
 
-          <Card>
+          <Card className="flex min-h-[460px] flex-col">
             <CardHeader>
               <CardTitle>Sinais de dificuldade</CardTitle>
             </CardHeader>
-            <CardBody className="space-y-3">
+            <CardBody className="flex flex-1 flex-col">
               {report.difficulties.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                <div className="flex flex-1 items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
                   Nenhum sinal de dificuldade detetado no período atual.
                 </div>
               ) : (
-                report.difficulties.slice(0, 6).map((signal) => (
-                  <div
-                    key={signal.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-sm font-semibold text-navy">
-                        {signal.title}
+                <>
+                  <div className="flex-1 space-y-3">
+                    {paginatedDifficulties.map((signal) => (
+                      <div
+                        key={signal.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-navy">
+                            {signal.title}
+                          </div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            {signal.severity}
+                          </div>
+                        </div>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {signal.description}
+                        </p>
                       </div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        {signal.severity}
-                      </div>
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {signal.description}
-                    </p>
+                    ))}
                   </div>
-                ))
+                  {totalDifficultiesPages > 1 && (
+                    <div className="mt-auto border-t border-slate-200 pt-4">
+                      <Pagination
+                        currentPage={difficultiesPage}
+                        totalPages={totalDifficultiesPages}
+                        onPageChange={setDifficultiesPage}
+                        className="justify-center"
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </CardBody>
           </Card>

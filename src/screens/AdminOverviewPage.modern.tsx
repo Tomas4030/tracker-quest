@@ -11,6 +11,7 @@ import {
   CardTitle,
   Input,
   Modal,
+  Pagination,
   Select,
   Textarea,
   Topbar,
@@ -53,6 +54,8 @@ export const AdminOverviewPage: React.FC = () => {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<AccountWizardStep>(1);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [accountsPage, setAccountsPage] = useState(1);
+  const [recentActivitiesTeamPage, setRecentActivitiesTeamPage] = useState(1);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
@@ -168,6 +171,27 @@ export const AdminOverviewPage: React.FC = () => {
   const inactiveAccounts = filteredUsers.filter(
     (user) => user.active === false,
   ).length;
+
+  // Pagination for accounts (4 per page)
+  const ACCOUNTS_PER_PAGE = 4;
+  const totalAccountsPages = Math.ceil(
+    filteredUsers.length / ACCOUNTS_PER_PAGE,
+  );
+  const paginatedUsers = filteredUsers.slice(
+    (accountsPage - 1) * ACCOUNTS_PER_PAGE,
+    accountsPage * ACCOUNTS_PER_PAGE,
+  );
+
+  // Pagination for team activities (6 per page)
+  const ACTIVITIES_PER_PAGE = 6;
+  const totalTeamActivitiesPages = Math.ceil(
+    filteredActivities.length / ACTIVITIES_PER_PAGE,
+  );
+  const paginatedTeamActivities = filteredActivities.slice(
+    (recentActivitiesTeamPage - 1) * ACTIVITIES_PER_PAGE,
+    recentActivitiesTeamPage * ACTIVITIES_PER_PAGE,
+  );
+
   const openWizard = (user?: User) => {
     if (user) {
       setEditingUserId(user.id);
@@ -438,143 +462,172 @@ export const AdminOverviewPage: React.FC = () => {
           <Alert type="error" message={error} onClose={() => setError(null)} />
         )}
 
-        <div className="grid gap-4 xl:grid-cols-2">
-          {filteredUsers.map((member) => {
-            const memberActivities = activities.filter(
-              (activity) => activity.userId === member.id,
-            );
-            const memberHours = memberActivities.reduce(
-              (sum, activity) =>
-                sum + calculateHours(activity.startTime, activity.endTime),
-              0,
-            );
-            return (
-              <Card
-                key={member.id}
-                className={member.active === false ? "opacity-75" : ""}
-              >
-                <CardBody className="space-y-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="text-lg font-semibold text-navy">
-                        {member.name}
+        <div className="flex min-h-[620px] flex-col gap-4">
+          <div className="grid gap-4 xl:grid-cols-2">
+            {paginatedUsers.map((member) => {
+              const memberActivities = activities.filter(
+                (activity) => activity.userId === member.id,
+              );
+              const memberHours = memberActivities.reduce(
+                (sum, activity) =>
+                  sum + calculateHours(activity.startTime, activity.endTime),
+                0,
+              );
+              return (
+                <Card
+                  key={member.id}
+                  className={member.active === false ? "opacity-75" : ""}
+                >
+                  <CardBody className="space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-lg font-semibold text-navy">
+                          {member.name}
+                        </div>
+                        <div className="mt-1 text-sm text-slate-500">
+                          {member.email}
+                        </div>
                       </div>
-                      <div className="mt-1 text-sm text-slate-500">
-                        {member.email}
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge
+                          label={
+                            member.role === "admin" ? "Admin" : "Estagiário"
+                          }
+                        />
+                        <Badge
+                          label={member.active === false ? "Inativa" : "Ativa"}
+                        />
                       </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <Badge
-                        label={member.role === "admin" ? "Admin" : "Estagiário"}
-                      />
-                      <Badge
-                        label={member.active === false ? "Inativa" : "Ativa"}
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                      <div className="text-slate-500">Equipa</div>
-                      <div className="mt-1 font-medium text-navy">
-                        {member.teamName || "Sem equipa"}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                        <div className="text-slate-500">Equipa</div>
+                        <div className="mt-1 font-medium text-navy">
+                          {member.teamName || "Sem equipa"}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                        <div className="text-slate-500">Projetos</div>
+                        <div className="mt-1 font-medium text-navy">
+                          {member.projectIds?.length || 0}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                        <div className="text-slate-500">Horas registadas</div>
+                        <div className="mt-1 font-medium text-navy">
+                          {formatHours(memberHours)}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                        <div className="text-slate-500">Estado</div>
+                        <div className="mt-1 font-medium text-navy">
+                          {member.active === false ? "Inativa" : "Ativa"}
+                        </div>
                       </div>
                     </div>
-                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                      <div className="text-slate-500">Projetos</div>
-                      <div className="mt-1 font-medium text-navy">
-                        {member.projectIds?.length || 0}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                      <div className="text-slate-500">Horas registadas</div>
-                      <div className="mt-1 font-medium text-navy">
-                        {formatHours(memberHours)}
-                      </div>
-                    </div>
-                    <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                      <div className="text-slate-500">Estado</div>
-                      <div className="mt-1 font-medium text-navy">
-                        {member.active === false ? "Inativa" : "Ativa"}
-                      </div>
-                    </div>
-                  </div>
 
-                  {member.projectIds && member.projectIds.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {member.projectIds.map((projectId) => {
-                        const project = projects.find(
-                          (item) => item.id === projectId,
-                        );
-                        return (
-                          <span
-                            key={projectId}
-                            className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700"
-                          >
-                            {project?.name || projectId}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
+                    {member.projectIds && member.projectIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {member.projectIds.map((projectId) => {
+                          const project = projects.find(
+                            (item) => item.id === projectId,
+                          );
+                          return (
+                            <span
+                              key={projectId}
+                              className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700"
+                            >
+                              {project?.name || projectId}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
 
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => openWizard(member)}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={member.active === false ? "success" : "danger"}
-                      onClick={() => toggleUserActive(member)}
-                    >
-                      {member.active === false ? "Ativar" : "Desativar"}
-                    </Button>
-                  </div>
-                </CardBody>
-              </Card>
-            );
-          })}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => openWizard(member)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={member.active === false ? "success" : "danger"}
+                        onClick={() => toggleUserActive(member)}
+                      >
+                        {member.active === false ? "Ativar" : "Desativar"}
+                      </Button>
+                    </div>
+                  </CardBody>
+                </Card>
+              );
+            })}
+          </div>
+
+          {totalAccountsPages > 1 && (
+            <div className="mt-auto border-t border-slate-200 pt-4">
+              <Pagination
+                currentPage={accountsPage}
+                totalPages={totalAccountsPages}
+                onPageChange={setAccountsPage}
+                className="justify-center"
+              />
+            </div>
+          )}
         </div>
 
-        <Card>
+        <Card className="flex min-h-[420px] flex-col">
           <CardHeader>
             <CardTitle>Atividades recentes da equipa</CardTitle>
           </CardHeader>
-          <CardBody className="space-y-3">
-            {filteredActivities.slice(0, 8).map((activity) => {
-              const owner = users.find((user) => user.id === activity.userId);
-              const project = projects.find(
-                (item) => item.id === activity.projectId,
-              );
-              return (
-                <div
-                  key={activity.id}
-                  className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-navy">
-                        {activity.title}
+          <CardBody className="flex flex-1 flex-col">
+            <div className="flex-1 space-y-3">
+              {paginatedTeamActivities.map((activity) => {
+                const owner = users.find((user) => user.id === activity.userId);
+                const project = projects.find(
+                  (item) => item.id === activity.projectId,
+                );
+                return (
+                  <div
+                    key={activity.id}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-navy">
+                          {activity.title}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {owner?.name || "Sem utilizador"} ·{" "}
+                          {project?.name ||
+                            activity.projectName ||
+                            "Sem projeto"}
+                        </div>
                       </div>
-                      <div className="mt-1 text-xs text-slate-500">
-                        {owner?.name || "Sem utilizador"} ·{" "}
-                        {project?.name || activity.projectName || "Sem projeto"}
-                      </div>
+                      <Badge status={activity.status} />
                     </div>
-                    <Badge status={activity.status} />
+                    {activity.description && (
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        {activity.description}
+                      </p>
+                    )}
                   </div>
-                  {activity.description && (
-                    <p className="mt-3 text-sm leading-6 text-slate-600">
-                      {activity.description}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+            {totalTeamActivitiesPages > 1 && (
+              <div className="mt-auto border-t border-slate-200 pt-4">
+                <Pagination
+                  currentPage={recentActivitiesTeamPage}
+                  totalPages={totalTeamActivitiesPages}
+                  onPageChange={setRecentActivitiesTeamPage}
+                  className="justify-center"
+                />
+              </div>
+            )}
           </CardBody>
         </Card>
       </div>
