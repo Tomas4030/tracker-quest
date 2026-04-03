@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   Badge,
@@ -9,6 +15,7 @@ import {
   CardBody,
   CardHeader,
   CardTitle,
+  EmptyState,
   Input,
   Modal,
   Pagination,
@@ -56,6 +63,7 @@ export const AdminOverviewPage: React.FC = () => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [accountsPage, setAccountsPage] = useState(1);
   const [recentActivitiesTeamPage, setRecentActivitiesTeamPage] = useState(1);
+  const [teamActivitiesCardHeight, setTeamActivitiesCardHeight] = useState(420);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formName, setFormName] = useState("");
@@ -69,6 +77,7 @@ export const AdminOverviewPage: React.FC = () => {
   const [formActive, setFormActive] = useState(true);
   const [formNotes, setFormNotes] = useState("");
   const [projectSearchTerm, setProjectSearchTerm] = useState("");
+  const teamActivitiesMeasureRef = useRef<HTMLDivElement | null>(null);
 
   const refreshData = async () => {
     const [loadedUsers, loadedProjects, loadedTeams, loadedActivities] =
@@ -173,7 +182,7 @@ export const AdminOverviewPage: React.FC = () => {
   ).length;
 
   // Pagination for accounts (4 per page)
-  const ACCOUNTS_PER_PAGE = 4;
+  const ACCOUNTS_PER_PAGE = 2;
   const totalAccountsPages = Math.ceil(
     filteredUsers.length / ACCOUNTS_PER_PAGE,
   );
@@ -191,6 +200,40 @@ export const AdminOverviewPage: React.FC = () => {
     (recentActivitiesTeamPage - 1) * ACTIVITIES_PER_PAGE,
     recentActivitiesTeamPage * ACTIVITIES_PER_PAGE,
   );
+
+  const allTeamActivityPages = useMemo(() => {
+    return Array.from({ length: totalTeamActivitiesPages }, (_, index) =>
+      filteredActivities.slice(
+        index * ACTIVITIES_PER_PAGE,
+        (index + 1) * ACTIVITIES_PER_PAGE,
+      ),
+    );
+  }, [filteredActivities, totalTeamActivitiesPages]);
+
+  useLayoutEffect(() => {
+    const measureTeamActivities = () => {
+      const container = teamActivitiesMeasureRef.current;
+      if (!container) return;
+
+      let maxHeight = 420;
+
+      container
+        .querySelectorAll<HTMLElement>("[data-page-height]")
+        .forEach((node) => {
+          maxHeight = Math.max(maxHeight, node.scrollHeight);
+        });
+
+      setTeamActivitiesCardHeight(maxHeight);
+    };
+
+    const frame = requestAnimationFrame(measureTeamActivities);
+    window.addEventListener("resize", measureTeamActivities);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", measureTeamActivities);
+    };
+  }, [allTeamActivityPages, users]);
 
   const openWizard = (user?: User) => {
     if (user) {
@@ -462,7 +505,7 @@ export const AdminOverviewPage: React.FC = () => {
           <Alert type="error" message={error} onClose={() => setError(null)} />
         )}
 
-        <div className="flex min-h-[620px] flex-col gap-4">
+        <div className="flex min-h-[320px] flex-col gap-4">
           <div className="grid gap-4 xl:grid-cols-2">
             {paginatedUsers.map((member) => {
               const memberActivities = activities.filter(
@@ -579,57 +622,162 @@ export const AdminOverviewPage: React.FC = () => {
           )}
         </div>
 
-        <Card className="flex min-h-[420px] flex-col">
-          <CardHeader>
-            <CardTitle>Atividades recentes da equipa</CardTitle>
-          </CardHeader>
-          <CardBody className="flex flex-1 flex-col">
-            <div className="flex-1 space-y-3">
-              {paginatedTeamActivities.map((activity) => {
-                const owner = users.find((user) => user.id === activity.userId);
-                const project = projects.find(
-                  (item) => item.id === activity.projectId,
-                );
-                return (
-                  <div
-                    key={activity.id}
-                    className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-navy">
-                          {activity.title}
+        <div
+          className="flex w-full"
+          style={{ height: `${teamActivitiesCardHeight}px` }}
+        >
+          <Card className="flex h-full w-full flex-col overflow-hidden">
+            <CardHeader>
+              <CardTitle>Atividades recentes da equipa</CardTitle>
+            </CardHeader>
+            <CardBody className="flex flex-1 flex-col overflow-hidden p-0">
+              {paginatedTeamActivities.length === 0 ? (
+                <div className="flex flex-1 items-center p-6">
+                  <EmptyState
+                    title="Sem atividades"
+                    description="Não há atividades disponíveis para a equipa selecionada."
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-6 pr-1">
+                    {paginatedTeamActivities.map((activity) => {
+                      const owner = users.find(
+                        (user) => user.id === activity.userId,
+                      );
+                      const project = projects.find(
+                        (item) => item.id === activity.projectId,
+                      );
+                      return (
+                        <div
+                          key={activity.id}
+                          className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-semibold text-navy">
+                                {activity.title}
+                              </div>
+                              <div className="mt-1 text-xs text-slate-500">
+                                {owner?.name || "Sem utilizador"} ·{" "}
+                                {project?.name ||
+                                  activity.projectName ||
+                                  "Sem projeto"}
+                              </div>
+                            </div>
+                            <Badge status={activity.status} />
+                          </div>
+                          {activity.description && (
+                            <p className="mt-3 text-sm leading-6 text-slate-600">
+                              {activity.description}
+                            </p>
+                          )}
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">
-                          {owner?.name || "Sem utilizador"} ·{" "}
-                          {project?.name ||
-                            activity.projectName ||
-                            "Sem projeto"}
-                        </div>
-                      </div>
-                      <Badge status={activity.status} />
-                    </div>
-                    {activity.description && (
-                      <p className="mt-3 text-sm leading-6 text-slate-600">
-                        {activity.description}
-                      </p>
-                    )}
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
-            {totalTeamActivitiesPages > 1 && (
-              <div className="mt-auto border-t border-slate-200 pt-4">
-                <Pagination
-                  currentPage={recentActivitiesTeamPage}
-                  totalPages={totalTeamActivitiesPages}
-                  onPageChange={setRecentActivitiesTeamPage}
-                  className="justify-center"
-                />
+                  {totalTeamActivitiesPages > 1 && (
+                    <div className="shrink-0 border-t border-slate-200 p-4">
+                      <Pagination
+                        currentPage={recentActivitiesTeamPage}
+                        totalPages={totalTeamActivitiesPages}
+                        onPageChange={setRecentActivitiesTeamPage}
+                        className="justify-center"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+
+        <div
+          ref={teamActivitiesMeasureRef}
+          className="pointer-events-none absolute left-0 top-0 -z-10 w-full opacity-0"
+        >
+          <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
+            {allTeamActivityPages.length === 0 ? (
+              <div data-page-height className="w-full">
+                <Card className="flex flex-col overflow-hidden">
+                  <CardHeader>
+                    <CardTitle>Atividades recentes da equipa</CardTitle>
+                  </CardHeader>
+                  <CardBody className="flex flex-col p-0">
+                    <div className="flex flex-1 items-center p-6">
+                      <EmptyState
+                        title="Sem atividades"
+                        description="Não há atividades disponíveis para a equipa selecionada."
+                      />
+                    </div>
+                  </CardBody>
+                </Card>
               </div>
+            ) : (
+              allTeamActivityPages.map((page, pageIndex) => (
+                <div
+                  key={`team-activities-measure-${pageIndex}`}
+                  data-page-height
+                  className="w-full"
+                >
+                  <Card className="flex flex-col overflow-hidden">
+                    <CardHeader>
+                      <CardTitle>Atividades recentes da equipa</CardTitle>
+                    </CardHeader>
+                    <CardBody className="flex flex-col p-0">
+                      <div className="flex flex-col gap-3 p-6 pr-1">
+                        {page.map((activity) => {
+                          const owner = users.find(
+                            (user) => user.id === activity.userId,
+                          );
+                          const project = projects.find(
+                            (item) => item.id === activity.projectId,
+                          );
+                          return (
+                            <div
+                              key={activity.id}
+                              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-semibold text-navy">
+                                    {activity.title}
+                                  </div>
+                                  <div className="mt-1 text-xs text-slate-500">
+                                    {owner?.name || "Sem utilizador"} ·{" "}
+                                    {project?.name ||
+                                      activity.projectName ||
+                                      "Sem projeto"}
+                                  </div>
+                                </div>
+                                <Badge status={activity.status} />
+                              </div>
+                              {activity.description && (
+                                <p className="mt-3 text-sm leading-6 text-slate-600">
+                                  {activity.description}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {totalTeamActivitiesPages > 1 && (
+                        <div className="border-t border-slate-200 p-4">
+                          <Pagination
+                            currentPage={pageIndex + 1}
+                            totalPages={totalTeamActivitiesPages}
+                            onPageChange={() => {}}
+                            className="justify-center"
+                          />
+                        </div>
+                      )}
+                    </CardBody>
+                  </Card>
+                </div>
+              ))
             )}
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       </div>
 
       <Modal

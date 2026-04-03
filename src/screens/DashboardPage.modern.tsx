@@ -434,47 +434,51 @@ export const DashboardPage: React.FC = () => {
                 <CardTitle>Sinais de dificuldade</CardTitle>
               </CardHeader>
 
-              <CardBody className="flex flex-1 flex-col overflow-hidden">
+              <CardBody className="flex flex-1 flex-col overflow-hidden p-0">
                 {report.difficulties.length === 0 ? (
-                  <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-                    Nenhum sinal de dificuldade detetado no período atual.
+                  <div className="flex flex-1 items-center justify-center p-6">
+                    <div className="flex w-full max-w-md items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600">
+                      Nenhum sinal de dificuldade detetado no período atual.
+                    </div>
                   </div>
                 ) : (
-                  <>
-                    <div className="flex flex-1 flex-col space-y-3 pr-1">
-                      {paginatedDifficulties.map((signal) => (
-                        <div
-                          key={signal.id}
-                          className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="text-sm font-semibold text-navy">
-                              {signal.title}
+                  <div className="flex flex-1 flex-col">
+                    <div className="flex flex-1 items-center">
+                      <div className="w-full space-y-3 pr-1">
+                        {paginatedDifficulties.map((signal) => (
+                          <div
+                            key={signal.id}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-sm font-semibold text-navy">
+                                {signal.title}
+                              </div>
+
+                              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                {signal.severity}
+                              </div>
                             </div>
 
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              {signal.severity}
-                            </div>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                              {signal.description}
+                            </p>
                           </div>
-
-                          <p className="mt-2 text-sm leading-6 text-slate-600">
-                            {signal.description}
-                          </p>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="mt-auto shrink-0 border-t border-slate-200 pt-4">
-                      {totalDifficultiesPages > 1 && (
+                    {totalDifficultiesPages > 1 && (
+                      <div className="shrink-0 border-t border-slate-200 p-4">
                         <Pagination
                           currentPage={difficultiesPage}
                           totalPages={totalDifficultiesPages}
                           onPageChange={setDifficultiesPage}
                           className="justify-center"
                         />
-                      )}
-                    </div>
-                  </>
+                      </div>
+                    )}
+                  </div>
                 )}
               </CardBody>
             </Card>
