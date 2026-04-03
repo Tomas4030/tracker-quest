@@ -9,7 +9,6 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
-  InsightCard,
   Pagination,
   StatCard,
   Topbar,
@@ -83,7 +82,7 @@ export const DashboardPage: React.FC = () => {
   );
 
   // Pagination for recent activities (6 per page)
-  const RECENT_ACTIVITIES_PER_PAGE = 6;
+  const RECENT_ACTIVITIES_PER_PAGE = 4;
   const totalRecentActivityPages = Math.ceil(
     allRecentActivities.length / RECENT_ACTIVITIES_PER_PAGE,
   );
@@ -92,8 +91,8 @@ export const DashboardPage: React.FC = () => {
     recentActivitiesPage * RECENT_ACTIVITIES_PER_PAGE,
   );
 
-  // Pagination for difficulties (6 per page)
-  const DIFFICULTIES_PER_PAGE = 6;
+  // Pagination for difficulties (4 per page)
+  const DIFFICULTIES_PER_PAGE = 4;
   const totalDifficultiesPages = Math.ceil(
     report.difficulties.length / DIFFICULTIES_PER_PAGE,
   );
@@ -101,6 +100,7 @@ export const DashboardPage: React.FC = () => {
     (difficultiesPage - 1) * DIFFICULTIES_PER_PAGE,
     difficultiesPage * DIFFICULTIES_PER_PAGE,
   );
+
   const todayHours = scopedActivities
     .filter((activity) => activity.date === today)
     .reduce(
@@ -108,6 +108,7 @@ export const DashboardPage: React.FC = () => {
         sum + calculateHours(activity.startTime, activity.endTime),
       0,
     );
+
   const weekHours = scopedActivities
     .filter((activity) => weekDates.includes(activity.date))
     .reduce(
@@ -115,10 +116,12 @@ export const DashboardPage: React.FC = () => {
         sum + calculateHours(activity.startTime, activity.endTime),
       0,
     );
+
   const completionRate =
     scopedActivities.length > 0
       ? Math.round((report.completedTasks / scopedActivities.length) * 100)
       : 0;
+
   const activeInterns = users.filter(
     (item) => item.role === "estagiario" && item.active !== false,
   ).length;
@@ -237,8 +240,8 @@ export const DashboardPage: React.FC = () => {
           ))}
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-          <Card className="flex min-h-[460px] flex-col">
+        <section>
+          <Card className="flex min-h-[300px] flex-col align-center justify-center">
             <CardHeader className="flex items-center justify-between gap-3">
               <CardTitle>Produtividade semanal</CardTitle>
               <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
@@ -275,21 +278,10 @@ export const DashboardPage: React.FC = () => {
               </div>
             </CardBody>
           </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Insights automáticos</CardTitle>
-            </CardHeader>
-            <CardBody className="space-y-3">
-              {report.insights.map((insight) => (
-                <InsightCard key={insight.id} {...insight} />
-              ))}
-            </CardBody>
-          </Card>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-          <Card>
+        <section className="grid gap-6 xl:grid-cols-2">
+          <Card className="flex h-[700px] flex-col overflow-hidden">
             <CardHeader className="flex items-center justify-between gap-3">
               <CardTitle>Atividades recentes</CardTitle>
               <Link
@@ -299,7 +291,7 @@ export const DashboardPage: React.FC = () => {
                 Ver calendário
               </Link>
             </CardHeader>
-            <CardBody className="flex flex-1 flex-col p-0">
+            <CardBody className="flex flex-1 flex-col overflow-hidden p-0">
               {recentActivities.length === 0 ? (
                 <div className="flex flex-1 items-center p-6">
                   <EmptyState
@@ -309,7 +301,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <div className="flex-1">
+                  <div className="flex flex-1 flex-col overflow-y-auto pr-1">
                     {recentActivities.map((activity) => {
                       const actUser = users.find(
                         (item) => item.id === activity.userId,
@@ -325,7 +317,7 @@ export const DashboardPage: React.FC = () => {
                     })}
                   </div>
                   {totalRecentActivityPages > 1 && (
-                    <div className="mt-auto border-t border-slate-200 p-4">
+                    <div className="mt-auto shrink-0 border-t border-slate-200 p-4">
                       <Pagination
                         currentPage={recentActivitiesPage}
                         totalPages={totalRecentActivityPages}
@@ -339,18 +331,19 @@ export const DashboardPage: React.FC = () => {
             </CardBody>
           </Card>
 
-          <Card className="flex min-h-[460px] flex-col">
-            <CardHeader>
+          <Card className="flex h-[700px] flex-col overflow-hidden">
+            <CardHeader className="shrink-0">
               <CardTitle>Sinais de dificuldade</CardTitle>
             </CardHeader>
-            <CardBody className="flex flex-1 flex-col">
+
+            <CardBody className="flex min-h-0 flex-1 flex-col">
               {report.difficulties.length === 0 ? (
-                <div className="flex flex-1 items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
+                <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
                   Nenhum sinal de dificuldade detetado no período atual.
                 </div>
               ) : (
                 <>
-                  <div className="flex-1 space-y-3">
+                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1 ">
                     {paginatedDifficulties.map((signal) => (
                       <div
                         key={signal.id}
@@ -370,16 +363,17 @@ export const DashboardPage: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                  {totalDifficultiesPages > 1 && (
-                    <div className="mt-auto border-t border-slate-200 pt-4">
+
+                  <div className="shrink-0 border-t border-slate-200 pt-4">
+                    {totalDifficultiesPages > 1 && (
                       <Pagination
                         currentPage={difficultiesPage}
                         totalPages={totalDifficultiesPages}
                         onPageChange={setDifficultiesPage}
                         className="justify-center"
                       />
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </>
               )}
             </CardBody>

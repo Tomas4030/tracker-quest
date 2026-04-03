@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
   Input,
-  InsightCard,
   Modal,
   Pagination,
   Select,
@@ -28,9 +27,7 @@ import type {
   User,
 } from "@/types";
 import {
-  buildSmartReport,
   getActivitiesForDate,
-  getCalendarLabel,
 } from "@/utils/analytics";
 import {
   calculateHours,
@@ -117,7 +114,6 @@ export const CalendarPage: React.FC = () => {
     });
   }, [user, loadActivities]);
 
-  // Reset pagination when date changes
   useEffect(() => {
     setDayActivityPage(1);
   }, [selectedDate]);
@@ -126,8 +122,9 @@ export const CalendarPage: React.FC = () => {
     return activities.filter((activity) => {
       if (!isAdmin && activity.userId !== user?.id) return false;
       if (filterUserId && activity.userId !== filterUserId) return false;
-      if (filterProjectId && activity.projectId !== filterProjectId)
+      if (filterProjectId && activity.projectId !== filterProjectId) {
         return false;
+      }
       if (filterStatus && activity.status !== filterStatus) return false;
       if (filterDate && activity.date !== filterDate) return false;
       return true;
@@ -142,41 +139,22 @@ export const CalendarPage: React.FC = () => {
     user?.id,
   ]);
 
-  const report = useMemo(
-    () =>
-      buildSmartReport({
-        activities: visibleActivities,
-        users: isAdmin ? users : users.filter((item) => item.id === user?.id),
-        projects,
-        periodLabel: getCalendarLabel(view, referenceDate),
-        referenceDate,
-      }),
-    [
-      visibleActivities,
-      users,
-      projects,
-      isAdmin,
-      user?.id,
-      view,
-      referenceDate,
-    ],
-  );
-
   const selectedDayActivities = getActivitiesForDate(
     visibleActivities,
     selectedDate,
   );
+
   const selectedDayHours = selectedDayActivities.reduce(
     (total, activity) =>
       total + calculateHours(activity.startTime, activity.endTime),
     0,
   );
 
-  // Pagination for day activities (4 per page)
   const ACTIVITIES_PER_PAGE = 4;
   const totalDayActivityPages = Math.ceil(
     selectedDayActivities.length / ACTIVITIES_PER_PAGE,
   );
+
   const paginatedDayActivities = selectedDayActivities.slice(
     (dayActivityPage - 1) * ACTIVITIES_PER_PAGE,
     dayActivityPage * ACTIVITIES_PER_PAGE,
@@ -297,39 +275,14 @@ export const CalendarPage: React.FC = () => {
   return (
     <>
       <Topbar title="Calendário de atividades" date={formatDate(new Date())} />
+
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-1 xl:grid-cols-1">
           <Card className="flex min-h-[100px] flex-col">
             <CardBody>
               <div className="text-sm text-slate-500">Total visível</div>
               <div className="mt-2 text-2xl font-semibold text-navy">
                 {visibleActivities.length}
-              </div>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardBody>
-              <div className="text-sm text-slate-500">Horas totais</div>
-              <div className="mt-2 text-2xl font-semibold text-navy">
-                {formatHours(report.totalHours)}
-              </div>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardBody>
-              <div className="text-sm text-slate-500">Concluídas</div>
-              <div className="mt-2 text-2xl font-semibold text-navy">
-                {report.completedTasks}
-              </div>
-            </CardBody>
-          </Card>
-          <Card>
-            <CardBody>
-              <div className="text-sm text-slate-500">
-                Sinais de dificuldade
-              </div>
-              <div className="mt-2 text-2xl font-semibold text-navy">
-                {report.difficulties.length}
               </div>
             </CardBody>
           </Card>
@@ -354,6 +307,7 @@ export const CalendarPage: React.FC = () => {
               ))}
             </div>
           </CardHeader>
+
           <CardBody className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             {isAdmin && (
               <Select
@@ -365,6 +319,7 @@ export const CalendarPage: React.FC = () => {
                   .map((item) => ({ value: item.id, label: item.name }))}
               />
             )}
+
             <Select
               label="Projeto"
               value={filterProjectId}
@@ -374,6 +329,7 @@ export const CalendarPage: React.FC = () => {
                 label: project.name,
               }))}
             />
+
             <Select
               label="Estado"
               value={filterStatus}
@@ -386,12 +342,14 @@ export const CalendarPage: React.FC = () => {
                 { value: "concluido", label: "Concluída" },
               ]}
             />
+
             <Input
               label="Data"
               type="date"
               value={filterDate}
               onChange={(event) => setFilterDate(event.target.value)}
             />
+
             <div className="flex items-end">
               <Button
                 variant="secondary"
@@ -416,6 +374,7 @@ export const CalendarPage: React.FC = () => {
             onClose={() => setSuccess(null)}
           />
         )}
+
         {error && (
           <Alert type="error" message={error} onClose={() => setError(null)} />
         )}
@@ -449,14 +408,15 @@ export const CalendarPage: React.FC = () => {
         />
 
         <div className="grid items-start gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-          <Card className="">
+          <Card>
             <CardHeader className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
               <CardTitle>Atividades do dia</CardTitle>
               <div className="text-sm text-slate-500">
                 {formatDate(`${selectedDate}T00:00:00`)}
               </div>
             </CardHeader>
-            <CardBody className="flex flex-1 flex-col p-0 ">
+
+            <CardBody className="flex flex-1 flex-col p-0">
               {selectedDayActivities.length === 0 ? (
                 <div className="flex flex-1 items-center p-6 text-sm text-slate-500">
                   Nenhuma atividade para a data selecionada.
@@ -471,6 +431,7 @@ export const CalendarPage: React.FC = () => {
                       const author = users.find(
                         (item) => item.id === activity.userId,
                       );
+
                       return (
                         <div key={activity.id} className="p-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -485,6 +446,7 @@ export const CalendarPage: React.FC = () => {
                                   "Sem projeto"}
                               </div>
                             </div>
+
                             <div className="flex items-center gap-2">
                               <Badge status={activity.status} />
                               <span className="text-xs font-mono text-slate-500">
@@ -497,11 +459,13 @@ export const CalendarPage: React.FC = () => {
                               </span>
                             </div>
                           </div>
+
                           {activity.description && (
                             <p className="mt-3 text-sm leading-6 text-slate-600">
                               {activity.description}
                             </p>
                           )}
+
                           <div className="mt-4 flex gap-2">
                             <Button
                               size="sm"
@@ -522,6 +486,7 @@ export const CalendarPage: React.FC = () => {
                       );
                     })}
                   </div>
+
                   {totalDayActivityPages > 1 && (
                     <div className="mt-auto border-t border-slate-200 p-4">
                       <Pagination
@@ -556,18 +521,21 @@ export const CalendarPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <div className="text-sm text-slate-500">Horas registadas</div>
                   <div className="mt-1 text-2xl font-semibold text-navy">
                     {formatHours(selectedDayHours)}
                   </div>
                 </div>
+
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <div className="text-sm text-slate-500">Atividades</div>
                   <div className="mt-1 text-2xl font-semibold text-navy">
                     {selectedDayActivities.length}
                   </div>
                 </div>
+
                 <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                   O calendário destaca o contexto do trabalho e facilita a
                   leitura por dia, semana e mês.
@@ -588,12 +556,6 @@ export const CalendarPage: React.FC = () => {
                 </Button>
               </CardBody>
             </Card>
-
-            <div className="grid gap-4">
-              {report.insights.map((insight) => (
-                <InsightCard key={insight.id} {...insight} />
-              ))}
-            </div>
           </div>
         </div>
       </div>
@@ -622,6 +584,7 @@ export const CalendarPage: React.FC = () => {
                 .map((item) => ({ value: item.id, label: item.name }))}
             />
           )}
+
           <Input
             label="Data"
             type="date"
@@ -629,6 +592,7 @@ export const CalendarPage: React.FC = () => {
             onChange={(event) => setFormDate(event.target.value)}
             required
           />
+
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Hora de início"
@@ -645,6 +609,7 @@ export const CalendarPage: React.FC = () => {
               required
             />
           </div>
+
           <Select
             label="Projeto"
             value={formProjectId}
@@ -654,6 +619,7 @@ export const CalendarPage: React.FC = () => {
               label: project.name,
             }))}
           />
+
           <Input
             label="Título"
             type="text"
@@ -661,12 +627,14 @@ export const CalendarPage: React.FC = () => {
             onChange={(event) => setFormTitle(event.target.value)}
             required
           />
+
           <Textarea
             label="Descrição"
             value={formDescription}
             onChange={(event) => setFormDescription(event.target.value)}
             placeholder="Descreve o trabalho realizado, bloqueios e resultados obtidos"
           />
+
           <Select
             label="Estado"
             value={formStatus}
