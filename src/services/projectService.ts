@@ -122,6 +122,18 @@ class ProjectService {
   async toggleActive(id: string, active: boolean): Promise<Project> {
     return this.update(id, { active });
   }
+
+  async delete(id: string): Promise<void> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
+
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+
+    if (error) throw new Error(error.message);
+
+    this.projects = this.projects.filter((project) => project.id !== id);
+  }
 }
 
 export const projectService = new ProjectService();

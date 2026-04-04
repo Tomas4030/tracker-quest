@@ -4,12 +4,24 @@ import { supabase } from "./supabase";
 class TeamService {
   private teams: Team[] = [];
 
+  private buildGroupCode(name: string): string {
+    const normalized = name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "")
+      .slice(0, 6);
+    const base = normalized || "TEAM";
+    const suffix = Math.random().toString(36).slice(2, 6).toUpperCase();
+    return `${base}-${suffix}`;
+  }
+
   private _mapDbTeam(row: {
     id: string;
     name: string;
     company: string;
     group_code: string;
-    member_ids: string[];
+    member_ids?: string[];
     active: boolean;
     created_at?: string;
     updated_at?: string;
@@ -65,13 +77,14 @@ class TeamService {
       throw new Error("Supabase não configurado.");
     }
 
+    const groupCode = team.groupCode?.trim() || this.buildGroupCode(team.name);
+
     const { data, error } = await supabase
       .from("teams")
       .insert({
         name: team.name,
         company: team.company,
-        group_code: team.groupCode,
-        member_ids: team.memberIds || [],
+        group_code: groupCode,
         active: team.active,
       })
       .select("*")
@@ -88,13 +101,18 @@ class TeamService {
       throw new Error("Supabase não configurado.");
     }
 
+    const shouldGenerateCode = updates.groupCode !== undefined;
+    const nextGroupCode = shouldGenerateCode
+      ? updates.groupCode?.trim() ||
+        this.buildGroupCode(updates.name || this.getById(id)?.name || "team")
+      : undefined;
+
     const { data, error } = await supabase
       .from("teams")
       .update({
         name: updates.name,
         company: updates.company,
-        group_code: updates.groupCode,
-        member_ids: updates.memberIds,
+        group_code: nextGroupCode,
         active: updates.active,
       })
       .eq("id", id)
@@ -117,6 +135,18 @@ class TeamService {
 
   async toggleActive(id: string, active: boolean): Promise<Team> {
     return this.update(id, { active });
+  }
+
+  async delete(id: string): Promise<void> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
+
+    const { error } = await supabase.from("teams").delete().eq("id", id);
+
+    if (error) throw new Error(error.message);
+
+    this.teams = this.teams.filter((team) => team.id !== id);
   }
 }
 

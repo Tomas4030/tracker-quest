@@ -20,7 +20,6 @@ import {
   Modal,
   Pagination,
   Select,
-  Textarea,
   Topbar,
   StatCard,
 } from "@/components";
@@ -32,7 +31,7 @@ import {
 } from "@/services";
 import { useAppStore } from "@/store";
 import type { Activity, Project, Team, User, UserRole } from "@/types";
-import { calculateHours, formatHours,formatTime } from "@/utils/helpers";
+import { calculateHours, formatHours, formatTime } from "@/utils/helpers";
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "estagiario", label: "Estagiário" },
@@ -62,6 +61,8 @@ export const AdminOverviewPage: React.FC = () => {
   const [wizardStep, setWizardStep] = useState<AccountWizardStep>(1);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [accountsPage, setAccountsPage] = useState(1);
+  const [teamsPage, setTeamsPage] = useState(1);
+  const [projectsPage, setProjectsPage] = useState(1);
   const [recentActivitiesTeamPage, setRecentActivitiesTeamPage] = useState(1);
   const [teamActivitiesCardHeight, setTeamActivitiesCardHeight] = useState(420);
   const [success, setSuccess] = useState<string | null>(null);
@@ -75,9 +76,19 @@ export const AdminOverviewPage: React.FC = () => {
   const [formCompany, setFormCompany] = useState("");
   const [formProjectIds, setFormProjectIds] = useState<string[]>([]);
   const [formActive, setFormActive] = useState(true);
-  const [formNotes, setFormNotes] = useState("");
   const [projectSearchTerm, setProjectSearchTerm] = useState("");
   const teamActivitiesMeasureRef = useRef<HTMLDivElement | null>(null);
+
+  // Modal states — equipas
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [teamFormName, setTeamFormName] = useState("");
+
+  // Modal states — projetos
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [projectFormName, setProjectFormName] = useState("");
+  const [projectFormDescription, setProjectFormDescription] = useState("");
 
   const refreshData = async () => {
     const [loadedUsers, loadedProjects, loadedTeams, loadedActivities] =
@@ -116,11 +127,6 @@ export const AdminOverviewPage: React.FC = () => {
       setFormGroupCode("");
     }
   }, [formTeamId, teams]);
-
-  const selectedTeam = useMemo(
-    () => teams.find((team) => team.id === formTeamId),
-    [formTeamId, teams],
-  );
 
   const selectedProjects = useMemo(
     () => projects.filter((project) => formProjectIds.includes(project.id)),
@@ -185,7 +191,6 @@ export const AdminOverviewPage: React.FC = () => {
     (user) => user.active === false,
   ).length;
 
-  // Pagination for accounts (4 per page)
   const ACCOUNTS_PER_PAGE = 2;
   const totalAccountsPages = Math.ceil(
     filteredUsers.length / ACCOUNTS_PER_PAGE,
@@ -195,7 +200,6 @@ export const AdminOverviewPage: React.FC = () => {
     accountsPage * ACCOUNTS_PER_PAGE,
   );
 
-  // Pagination for team activities (6 per page)
   const ACTIVITIES_PER_PAGE = 6;
   const totalTeamActivitiesPages = Math.ceil(
     filteredActivities.length / ACTIVITIES_PER_PAGE,
@@ -214,30 +218,43 @@ export const AdminOverviewPage: React.FC = () => {
     );
   }, [filteredActivities, totalTeamActivitiesPages]);
 
+  const TEAM_CARDS_PER_PAGE = 6;
+  const totalTeamsPages = Math.ceil(teams.length / TEAM_CARDS_PER_PAGE);
+  const paginatedTeams = teams.slice(
+    (teamsPage - 1) * TEAM_CARDS_PER_PAGE,
+    teamsPage * TEAM_CARDS_PER_PAGE,
+  );
+
+  const PROJECT_CARDS_PER_PAGE = 6;
+  const totalProjectsPages = Math.ceil(
+    projects.length / PROJECT_CARDS_PER_PAGE,
+  );
+  const paginatedProjects = projects.slice(
+    (projectsPage - 1) * PROJECT_CARDS_PER_PAGE,
+    projectsPage * PROJECT_CARDS_PER_PAGE,
+  );
+
   useLayoutEffect(() => {
     const measureTeamActivities = () => {
       const container = teamActivitiesMeasureRef.current;
       if (!container) return;
-
       let maxHeight = 420;
-
       container
         .querySelectorAll<HTMLElement>("[data-page-height]")
         .forEach((node) => {
           maxHeight = Math.max(maxHeight, node.scrollHeight);
         });
-
       setTeamActivitiesCardHeight(maxHeight);
     };
-
     const frame = requestAnimationFrame(measureTeamActivities);
     window.addEventListener("resize", measureTeamActivities);
-
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener("resize", measureTeamActivities);
     };
   }, [allTeamActivityPages, users]);
+
+  // ── Wizard de contas ────────────────────────────────────────────────────────
 
   const openWizard = (user?: User) => {
     if (user) {
@@ -251,7 +268,6 @@ export const AdminOverviewPage: React.FC = () => {
       setFormCompany(user.company || "");
       setFormProjectIds(user.projectIds || []);
       setFormActive(user.active !== false);
-      setFormNotes("");
     } else {
       setEditingUserId(null);
       setFormName("");
@@ -263,7 +279,6 @@ export const AdminOverviewPage: React.FC = () => {
       setFormCompany("");
       setFormProjectIds([]);
       setFormActive(true);
-      setFormNotes("");
       setProjectSearchTerm("");
     }
     setError(null);
@@ -289,22 +304,16 @@ export const AdminOverviewPage: React.FC = () => {
       setError("Preenche o nome e o email do utilizador.");
       return false;
     }
-
     if (!editingUserId && !formPassword.trim()) {
       setFormPassword(createTempPassword(formName));
     }
-
     return true;
   };
 
   const goToAssignmentStep = (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
-
-    if (!validateStepOne()) {
-      return;
-    }
-
+    if (!validateStepOne()) return;
     setWizardStep(2);
   };
 
@@ -325,20 +334,27 @@ export const AdminOverviewPage: React.FC = () => {
   const saveUser = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
-
     if (!formName.trim() || !formEmail.trim()) {
       setError("Preenche o nome e o email do utilizador.");
       return;
     }
-
     if (!editingUserId && !formTeamId) {
       setError("Seleciona uma equipa para criar a conta.");
       return;
     }
-
     try {
       const team = teams.find((item) => item.id === formTeamId) || null;
       const hasNewPassword = Boolean(formPassword.trim());
+      const payload = {
+        name: formName,
+        email: formEmail,
+        role: formRole,
+        active: formActive,
+        teamId: team?.id,
+        projectIds: formProjectIds,
+        company: team?.company || formCompany,
+        groupCode: team?.groupCode || formGroupCode,
+      };
 
       if (editingUserId && hasNewPassword) {
         setError(
@@ -346,44 +362,20 @@ export const AdminOverviewPage: React.FC = () => {
         );
         return;
       }
-
       if (editingUserId) {
-        await authService.updateUser(editingUserId, {
-          name: formName,
-          email: formEmail,
-          role: formRole,
-          active: formActive,
-          teamId: team?.id,
-          teamName: team?.name,
-          company: team?.company || formCompany,
-          groupCode: team?.groupCode || formGroupCode,
-          projectIds: formProjectIds,
-        });
+        await authService.updateUser(editingUserId, payload);
       } else {
         await authService.createAccount({
-          name: formName,
-          email: formEmail,
+          name: payload.name,
+          email: payload.email,
           password: formPassword.trim() || createTempPassword(formName),
-          role: formRole,
-          active: formActive,
-          teamId: team?.id,
-          projectIds: formProjectIds,
-          company: team?.company || formCompany,
-          groupCode: team?.groupCode || formGroupCode,
+          role: payload.role,
+          active: payload.active,
+          teamId: payload.teamId,
+          projectIds: payload.projectIds,
+          company: payload.company,
+          groupCode: payload.groupCode,
         });
-      }
-
-      if (team) {
-        await authService.assignUserTeam(
-          editingUserId ||
-            users.find((item) => item.email === formEmail)?.id ||
-            "",
-          team,
-        );
-      }
-
-      if (editingUserId) {
-        await authService.assignUserProjects(editingUserId, formProjectIds);
       }
 
       setSuccess(
@@ -418,10 +410,120 @@ export const AdminOverviewPage: React.FC = () => {
     }
   };
 
+  // ── Equipas ─────────────────────────────────────────────────────────────────
+
+  const openTeamModal = (team?: Team) => {
+    setEditingTeam(team || null);
+    setTeamFormName(team?.name || "");
+    setError(null);
+    setIsTeamModalOpen(true);
+  };
+
+  const saveTeam = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!teamFormName.trim()) {
+      setError("Preenche o nome da equipa.");
+      return;
+    }
+    try {
+      if (editingTeam) {
+        await teamService.update(editingTeam.id, {
+          name: teamFormName,
+          company: editingTeam.company,
+          groupCode: editingTeam.groupCode,
+          memberIds: editingTeam.memberIds,
+          active: editingTeam.active,
+        });
+      } else {
+        await teamService.create({
+          name: teamFormName,
+          company: "",
+          groupCode: "",
+          memberIds: [],
+          active: true,
+        });
+      }
+      setSuccess(editingTeam ? "Equipa atualizada." : "Equipa criada.");
+      setIsTeamModalOpen(false);
+      await refreshData();
+      setTimeout(() => setSuccess(null), 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao guardar equipa.");
+    }
+  };
+
+  const deleteTeam = async (teamId: string) => {
+    if (!confirm("Tens a certeza que queres apagar esta equipa?")) return;
+    try {
+      await teamService.delete(teamId);
+      setSuccess("Equipa apagada.");
+      await refreshData();
+      setTimeout(() => setSuccess(null), 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao apagar equipa.");
+    }
+  };
+
+  // ── Projetos ─────────────────────────────────────────────────────────────────
+
+  const openProjectModal = (project?: Project) => {
+    setEditingProject(project || null);
+    setProjectFormName(project?.name || "");
+    setProjectFormDescription(project?.description || "");
+    setError(null);
+    setIsProjectModalOpen(true);
+  };
+
+  const saveProject = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!projectFormName.trim()) {
+      setError("Preenche o nome do projeto.");
+      return;
+    }
+    try {
+      if (editingProject) {
+        await projectService.update(editingProject.id, {
+          name: projectFormName,
+          code: editingProject.code,
+          description: projectFormDescription,
+          color: editingProject.color,
+          active: editingProject.active,
+        });
+      } else {
+        await projectService.create({
+          name: projectFormName,
+          code: projectFormName.slice(0, 3).toUpperCase(),
+          description: projectFormDescription,
+          color: "#3b82f6",
+          active: true,
+        });
+      }
+      setSuccess(editingProject ? "Projeto atualizado." : "Projeto criado.");
+      setIsProjectModalOpen(false);
+      await refreshData();
+      setTimeout(() => setSuccess(null), 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao guardar projeto.");
+    }
+  };
+
+  const deleteProject = async (projectId: string) => {
+    if (!confirm("Tens a certeza que queres apagar este projeto?")) return;
+    try {
+      await projectService.delete(projectId);
+      setSuccess("Projeto apagado.");
+      await refreshData();
+      setTimeout(() => setSuccess(null), 1200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao apagar projeto.");
+    }
+  };
+
   return (
     <>
       <Topbar title="Painel de administração" />
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
+        {/* ── Stat cards ───────────────────────────────────────────────────────── */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             icon="👥"
@@ -445,6 +547,7 @@ export const AdminOverviewPage: React.FC = () => {
           />
         </div>
 
+        {/* ── Filtros de contas ─────────────────────────────────────────────────── */}
         <Card>
           <CardHeader className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <CardTitle>Gestão de contas</CardTitle>
@@ -498,6 +601,7 @@ export const AdminOverviewPage: React.FC = () => {
           </CardBody>
         </Card>
 
+        {/* ── Alertas globais ───────────────────────────────────────────────────── */}
         {success && (
           <Alert
             type="success"
@@ -509,6 +613,170 @@ export const AdminOverviewPage: React.FC = () => {
           <Alert type="error" message={error} onClose={() => setError(null)} />
         )}
 
+        {/* ── Gestão de Equipas ─────────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <CardTitle>Equipas</CardTitle>
+            <Button onClick={() => openTeamModal()} size="sm">
+              Nova equipa
+            </Button>
+          </CardHeader>
+          <CardBody className="space-y-4">
+            {teams.length === 0 ? (
+              <EmptyState
+                title="Sem equipas"
+                description="Cria a primeira equipa para começar."
+              />
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {paginatedTeams.map((team) => {
+                    const memberCount = users.filter(
+                      (u) => u.teamId === team.id,
+                    ).length;
+                    return (
+                      <div
+                        key={team.id}
+                        className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-navy truncate">
+                              {team.name}
+                            </div>
+                            {team.company && (
+                              <div className="mt-0.5 text-xs text-slate-500 truncate">
+                                {team.company}
+                              </div>
+                            )}
+                          </div>
+                          {team.groupCode && (
+                            <span className="shrink-0 rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">
+                              {team.groupCode}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {memberCount}{" "}
+                          {memberCount === 1 ? "membro" : "membros"}
+                        </div>
+                        <div className="flex gap-2 border-t border-slate-200 pt-3">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openTeamModal(team)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => deleteTeam(team.id)}
+                          >
+                            Apagar
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {totalTeamsPages > 1 && (
+                  <div className="border-t border-slate-200 pt-4">
+                    <Pagination
+                      currentPage={teamsPage}
+                      totalPages={totalTeamsPages}
+                      onPageChange={setTeamsPage}
+                      className="justify-center"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* ── Gestão de Projetos ────────────────────────────────────────────────── */}
+        <Card>
+          <CardHeader className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <CardTitle>Projetos</CardTitle>
+            <Button onClick={() => openProjectModal()} size="sm">
+              Novo projeto
+            </Button>
+          </CardHeader>
+          <CardBody className="space-y-4">
+            {projects.length === 0 ? (
+              <EmptyState
+                title="Sem projetos"
+                description="Cria o primeiro projeto para começar."
+              />
+            ) : (
+              <>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {paginatedProjects.map((project) => {
+                    const assignedCount = users.filter((u) =>
+                      u.projectIds?.includes(project.id),
+                    ).length;
+                    return (
+                      <div
+                        key={project.id}
+                        className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-semibold text-navy truncate">
+                              {project.name}
+                            </div>
+                            {project.description && (
+                              <div className="mt-0.5 text-xs text-slate-500 line-clamp-1">
+                                {project.description}
+                              </div>
+                            )}
+                          </div>
+                          <span className="shrink-0 rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                            {project.code}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500">
+                          {assignedCount}{" "}
+                          {assignedCount === 1 ? "estagiário" : "estagiários"}{" "}
+                          atribuídos
+                        </div>
+                        <div className="flex gap-2 border-t border-slate-200 pt-3">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => openProjectModal(project)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => deleteProject(project.id)}
+                          >
+                            Apagar
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {totalProjectsPages > 1 && (
+                  <div className="border-t border-slate-200 pt-4">
+                    <Pagination
+                      currentPage={projectsPage}
+                      totalPages={totalProjectsPages}
+                      onPageChange={setProjectsPage}
+                      className="justify-center"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </CardBody>
+        </Card>
+
+        {/* ── Cards de utilizadores ─────────────────────────────────────────────── */}
         <div className="flex min-h-[320px] flex-col gap-4">
           <div className="grid gap-4 xl:grid-cols-2">
             {paginatedUsers.map((member) => {
@@ -630,6 +898,7 @@ export const AdminOverviewPage: React.FC = () => {
           )}
         </div>
 
+        {/* ── Atividades recentes ───────────────────────────────────────────────── */}
         <div
           className="flex w-full"
           style={{ height: `${teamActivitiesCardHeight}px` }}
@@ -700,6 +969,7 @@ export const AdminOverviewPage: React.FC = () => {
           </Card>
         </div>
 
+        {/* ── Ghost div para medir altura das atividades ────────────────────────── */}
         <div
           ref={teamActivitiesMeasureRef}
           className="pointer-events-none absolute left-0 top-0 -z-10 w-full opacity-0"
@@ -788,6 +1058,7 @@ export const AdminOverviewPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ── Modal wizard — step 1 ─────────────────────────────────────────────── */}
       <Modal
         isOpen={isWizardOpen && wizardStep === 1}
         onClose={closeWizard}
@@ -811,7 +1082,6 @@ export const AdminOverviewPage: React.FC = () => {
                 Preenche os dados principais antes de avançar.
               </p>
             </div>
-
             <div className="space-y-3">
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -825,7 +1095,6 @@ export const AdminOverviewPage: React.FC = () => {
                   required
                 />
               </div>
-
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">
                   Email
@@ -839,7 +1108,6 @@ export const AdminOverviewPage: React.FC = () => {
                   required
                 />
               </div>
-
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -852,7 +1120,6 @@ export const AdminOverviewPage: React.FC = () => {
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
                   />
                 </div>
-
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">
                     Papel / perfil do utilizador
@@ -872,7 +1139,6 @@ export const AdminOverviewPage: React.FC = () => {
                   </select>
                 </div>
               </div>
-
               <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
                   <div className="text-sm font-medium text-navy">
@@ -901,6 +1167,7 @@ export const AdminOverviewPage: React.FC = () => {
         </form>
       </Modal>
 
+      {/* ── Modal wizard — step 2 ─────────────────────────────────────────────── */}
       <Modal
         isOpen={isWizardOpen && wizardStep === 2}
         onClose={closeWizard}
@@ -924,7 +1191,6 @@ export const AdminOverviewPage: React.FC = () => {
                 Define a equipa e associa os projetos da conta.
               </p>
             </div>
-
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
                 Equipa
@@ -942,35 +1208,6 @@ export const AdminOverviewPage: React.FC = () => {
                 ))}
               </select>
             </div>
-
-            {selectedTeam ? (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Empresa
-                  </label>
-                  <input
-                    value={formCompany}
-                    readOnly
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Código / grupo
-                  </label>
-                  <input
-                    value={formGroupCode}
-                    readOnly
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                Escolhe uma equipa para mostrar a empresa e o código/grupo.
-              </div>
-            )}
           </div>
 
           <div className="space-y-3">
@@ -982,7 +1219,6 @@ export const AdminOverviewPage: React.FC = () => {
                 Pesquisa, seleciona e remove projetos sem listas longas.
               </p>
             </div>
-
             <div className="rounded-xl border border-slate-200 bg-white p-3">
               <label className="mb-1 block text-sm font-medium text-slate-700">
                 Procurar projeto
@@ -993,7 +1229,6 @@ export const AdminOverviewPage: React.FC = () => {
                 placeholder="Escreve para filtrar projetos..."
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
               />
-
               {selectedProjects.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {selectedProjects.map((project) => (
@@ -1009,7 +1244,6 @@ export const AdminOverviewPage: React.FC = () => {
                   ))}
                 </div>
               )}
-
               <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
                 {filteredProjectOptions.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
@@ -1053,13 +1287,86 @@ export const AdminOverviewPage: React.FC = () => {
                 )}
               </div>
             </div>
+          </div>
+        </form>
+      </Modal>
 
-            <Textarea
-              label="Notas internas"
-              value={formNotes}
-              onChange={(event) => setFormNotes(event.target.value)}
-              placeholder="Observações internas sobre a conta (visível apenas a admins)"
-              rows={3}
+      {/* ── Modal — Nova / Editar equipa ──────────────────────────────────────── */}
+      <Modal
+        isOpen={isTeamModalOpen}
+        onClose={() => setIsTeamModalOpen(false)}
+        title={editingTeam ? "Editar equipa" : "Nova equipa"}
+        footer={
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setIsTeamModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={saveTeam}>
+              {editingTeam ? "Guardar" : "Criar"}
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={saveTeam} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Nome
+            </label>
+            <input
+              value={teamFormName}
+              onChange={(e) => setTeamFormName(e.target.value)}
+              placeholder="Ex: Turma A"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
+              required
+            />
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Modal — Novo / Editar projeto ────────────────────────────────────── */}
+      <Modal
+        isOpen={isProjectModalOpen}
+        onClose={() => setIsProjectModalOpen(false)}
+        title={editingProject ? "Editar projeto" : "Novo projeto"}
+        footer={
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setIsProjectModalOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={saveProject}>
+              {editingProject ? "Guardar" : "Criar"}
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={saveProject} className="space-y-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Nome
+            </label>
+            <input
+              value={projectFormName}
+              onChange={(e) => setProjectFormName(e.target.value)}
+              placeholder="Ex: Projeto Alpha"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Descrição
+            </label>
+            <input
+              value={projectFormDescription}
+              onChange={(e) => setProjectFormDescription(e.target.value)}
+              placeholder="Breve descrição (opcional)"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
             />
           </div>
         </form>

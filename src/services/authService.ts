@@ -11,6 +11,15 @@ const UUID_REGEX =
 class AuthService {
   private users: User[] = [];
 
+  private _isMissingColumnError(message: string, column: string): boolean {
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes("could not find") &&
+      normalized.includes(`'${column.toLowerCase()}'`) &&
+      normalized.includes("column")
+    );
+  }
+
   private _persistCurrentUser(user: User | null) {
     if (typeof window === "undefined") return;
     if (!user) {
@@ -235,24 +244,44 @@ class AuthService {
     if (error) throw new Error(error.message);
     if (!data.user) throw new Error("Account creation failed");
 
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .upsert(
-        {
-          id: data.user.id,
-          name,
-          email,
-          role,
-          active,
-          team_id: this._isUuid(teamId) ? teamId : null,
-          project_ids: projectIds || [],
-          company,
-          group_code: groupCode,
-        },
-        { onConflict: "id" },
-      )
-      .select("*")
-      .single();
+    const payload = {
+      id: data.user.id,
+      name,
+      email,
+      role,
+      active,
+      team_id: this._isUuid(teamId) ? teamId : null,
+      project_ids: projectIds || [],
+      company,
+      group_code: groupCode,
+    };
+
+    const attempt = async (withoutProjectIds: boolean) => {
+      const nextPayload = withoutProjectIds
+        ? (() => {
+            const { project_ids, ...rest } = payload;
+            void project_ids;
+            return rest;
+          })()
+        : payload;
+
+      return supabase
+        .from("users")
+        .upsert(nextPayload, { onConflict: "id" })
+        .select("*")
+        .single();
+    };
+
+    let { data: profile, error: profileError } = await attempt(false);
+
+    if (
+      profileError &&
+      this._isMissingColumnError(profileError.message, "project_ids")
+    ) {
+      const retry = await attempt(true);
+      profile = retry.data;
+      profileError = retry.error;
+    }
 
     if (profileError) throw new Error(profileError.message);
     const mapped = this._touchTeamMetadata(this._mapDbUser(profile));
@@ -275,25 +304,45 @@ class AuthService {
       );
     }
 
-    const { data, error } = await supabase
-      .from("users")
-      .update({
-        name: updates.name,
-        email: updates.email,
-        role: updates.role,
-        active: updates.active,
-        team_id: updates.teamId
-          ? this._isUuid(updates.teamId)
-            ? updates.teamId
-            : null
-          : undefined,
-        project_ids: updates.projectIds,
-        company: updates.company,
-        group_code: updates.groupCode,
-      })
-      .eq("id", id)
-      .select("*")
-      .single();
+    const payload = {
+      name: updates.name,
+      email: updates.email,
+      role: updates.role,
+      active: updates.active,
+      team_id: updates.teamId
+        ? this._isUuid(updates.teamId)
+          ? updates.teamId
+          : null
+        : undefined,
+      project_ids: updates.projectIds,
+      company: updates.company,
+      group_code: updates.groupCode,
+    };
+
+    const attempt = async (withoutProjectIds: boolean) => {
+      const nextPayload = withoutProjectIds
+        ? (() => {
+            const { project_ids, ...rest } = payload;
+            void project_ids;
+            return rest;
+          })()
+        : payload;
+
+      return supabase
+        .from("users")
+        .update(nextPayload)
+        .eq("id", id)
+        .select("*")
+        .single();
+    };
+
+    let { data, error } = await attempt(false);
+
+    if (error && this._isMissingColumnError(error.message, "project_ids")) {
+      const retry = await attempt(true);
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw new Error(error.message);
     const mapped = this._touchTeamMetadata(this._mapDbUser(data));
