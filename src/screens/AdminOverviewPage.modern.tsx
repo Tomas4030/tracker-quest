@@ -191,7 +191,7 @@ export const AdminOverviewPage: React.FC = () => {
     (user) => user.active === false,
   ).length;
 
-  const ACCOUNTS_PER_PAGE = 2;
+  const ACCOUNTS_PER_PAGE = 4;
   const totalAccountsPages = Math.ceil(
     filteredUsers.length / ACCOUNTS_PER_PAGE,
   );
@@ -896,8 +896,8 @@ export const AdminOverviewPage: React.FC = () => {
 
         {/* ── Atividades recentes ───────────────────────────────────────────────── */}
         <div
-          className="flex w-full"
-          style={{ height: `${teamActivitiesCardHeight}px` }}
+          className=""
+          style={{ maxHeight: `${teamActivitiesCardHeight}px` }}
         >
           <Card className="flex h-full w-full flex-col overflow-hidden">
             <CardHeader>
@@ -968,7 +968,7 @@ export const AdminOverviewPage: React.FC = () => {
         {/* ── Ghost div para medir altura das atividades ────────────────────────── */}
         <div
           ref={teamActivitiesMeasureRef}
-          className="pointer-events-none absolute left-0 top-0 -z-10 w-full opacity-0"
+          className="pointer-events-none absolute left-0 top-0 -z-10 h-0 w-0 overflow-hidden opacity-0"
         >
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
             {allTeamActivityPages.length === 0 ? (
