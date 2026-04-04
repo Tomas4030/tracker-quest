@@ -93,13 +93,6 @@ function isToday(dateKey: string): boolean {
   return dateKey === formatDateKey(now);
 }
 
-function isSameCalendarMonth(date: Date, referenceDate: Date): boolean {
-  return (
-    date.getMonth() === referenceDate.getMonth() &&
-    date.getFullYear() === referenceDate.getFullYear()
-  );
-}
-
 function getCalendarActivityLabel(activity: Activity): string {
   return `${formatTime(formatTime(activity.startTime))} - ${formatTime(formatTime(activity.endTime))}`;
 }

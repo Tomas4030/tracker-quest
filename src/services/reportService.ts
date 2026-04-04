@@ -3,6 +3,7 @@ import { activityService } from "./activityService";
 import { authService } from "./authService";
 import { projectService } from "./projectService";
 import { buildSmartReport } from "@/utils/analytics";
+import { formatTime } from "@/utils/helpers";
 
 type ReportScope = "user" | "team" | "admin";
 type ReportPeriod = "week" | "month" | "all";

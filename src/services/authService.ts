@@ -233,8 +233,9 @@ class AuthService {
         "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
     }
+    const db = supabase;
 
-    const { data, error } = await supabase.auth.signUp({
+    const { data, error } = await db.auth.signUp({
       email,
       password,
       options: {
@@ -265,7 +266,7 @@ class AuthService {
           })()
         : payload;
 
-      return supabase
+      return db
         .from("users")
         .upsert(nextPayload, { onConflict: "id" })
         .select("*")
@@ -303,6 +304,7 @@ class AuthService {
         "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
     }
+    const db = supabase;
 
     const payload = {
       name: updates.name,
@@ -328,7 +330,7 @@ class AuthService {
           })()
         : payload;
 
-      return supabase
+      return db
         .from("users")
         .update(nextPayload)
         .eq("id", id)
