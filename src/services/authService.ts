@@ -233,59 +233,39 @@ class AuthService {
         "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
     }
-    const db = supabase;
-
-    const { data, error } = await db.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name },
+    const response = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        role,
+        active,
+        teamId,
+        projectIds,
+        company,
+        groupCode,
+      }),
     });
-    if (error) throw new Error(error.message);
-    if (!data.user) throw new Error("Account creation failed");
 
-    const payload = {
-      id: data.user.id,
-      name,
-      email,
-      role,
-      active,
-      team_id: this._isUuid(teamId) ? teamId : null,
-      project_ids: projectIds || [],
-      company,
-      group_code: groupCode,
-    };
+    const payload = (await response.json()) as
+      | { error?: string }
+      | Record<string, unknown>;
 
-    const attempt = async (withoutProjectIds: boolean) => {
-      const nextPayload = withoutProjectIds
-        ? (() => {
-            const { project_ids, ...rest } = payload;
-            void project_ids;
-            return rest;
-          })()
-        : payload;
-
-      return db
-        .from("users")
-        .upsert(nextPayload, { onConflict: "id" })
-        .select("*")
-        .single();
-    };
-
-    let { data: profile, error: profileError } = await attempt(false);
-
-    if (
-      profileError &&
-      this._isMissingColumnError(profileError.message, "project_ids")
-    ) {
-      const retry = await attempt(true);
-      profile = retry.data;
-      profileError = retry.error;
+    if (!response.ok) {
+      const message =
+        typeof payload.error === "string"
+          ? payload.error
+          : "Falha ao criar a conta.";
+      throw new Error(message);
     }
 
-    if (profileError) throw new Error(profileError.message);
-    const mapped = this._touchTeamMetadata(this._mapDbUser(profile));
+    const mapped = this._touchTeamMetadata(
+      this._mapDbUser(payload as Parameters<typeof this._mapDbUser>[0]),
+    );
     this._upsertUserInCache(mapped);
     return mapped;
   }

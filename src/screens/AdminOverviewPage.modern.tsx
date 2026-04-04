@@ -338,10 +338,6 @@ export const AdminOverviewPage: React.FC = () => {
       setError("Preenche o nome e o email do utilizador.");
       return;
     }
-    if (!editingUserId && !formTeamId) {
-      setError("Seleciona uma equipa para criar a conta.");
-      return;
-    }
     try {
       const team = teams.find((item) => item.id === formTeamId) || null;
       const hasNewPassword = Boolean(formPassword.trim());
@@ -1193,14 +1189,14 @@ export const AdminOverviewPage: React.FC = () => {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                Equipa
+                Equipa (opcional)
               </label>
               <select
                 value={formTeamId}
                 onChange={(event) => setFormTeamId(event.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors focus:border-primary-500 focus:outline-none"
               >
-                <option value="">Seleciona uma opção</option>
+                <option value="">Sem equipa</option>
                 {teams.map((team) => (
                   <option key={team.id} value={team.id}>
                     {team.name}
@@ -1213,10 +1209,11 @@ export const AdminOverviewPage: React.FC = () => {
           <div className="space-y-3">
             <div>
               <h3 className="text-sm font-semibold text-navy">
-                Projetos atribuídos
+                Projetos atribuídos (opcional)
               </h3>
               <p className="mt-1 text-xs text-slate-500">
-                Pesquisa, seleciona e remove projetos sem listas longas.
+                Pesquisa, seleciona e remove projetos se quiseres associar
+                algum.
               </p>
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-3">
