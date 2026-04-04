@@ -12,6 +12,7 @@ import {
   calculateHours,
   formatDate,
   formatHours,
+  formatTime,
   formatTimeRange,
   getTodayString,
 } from "./helpers";

@@ -1,5 +1,6 @@
 import type { Activity, ActivityFilter } from "@/types";
 import { supabase } from "./supabase";
+import { formatTime } from "@/utils/helpers";
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

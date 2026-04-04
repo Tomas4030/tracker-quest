@@ -107,6 +107,20 @@ export function formatTime(time: string): string {
 }
 
 /**
+ * Format a time range
+ */
+export function formatTimeRange(startTime: string, endTime: string): string {
+  const start = formatTime(startTime);
+  const end = formatTime(endTime);
+
+  if (!start && !end) return "";
+  if (!start) return end;
+  if (!end) return start;
+
+  return `${start} - ${end}`;
+}
+
+/**
  * Get initials from name
  */
 export function getInitials(name: string): string {
