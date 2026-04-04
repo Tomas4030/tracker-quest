@@ -402,9 +402,9 @@ export const DashboardPage: React.FC = () => {
                 </Link>
               </CardHeader>
 
-              <CardBody className="flex flex-1 flex-col overflow-hidden p-0">
+              <CardBody className="flex flex-1 flex-col overflow-hidden p-0 ">
                 {recentActivities.length === 0 ? (
-                  <div className="flex flex-1 items-center p-6">
+                  <div className="flex flex-1 items-center p-6 ">
                     <EmptyState
                       title="Sem atividades"
                       description="Começa a registar tarefas para preencher o dashboard com dados úteis."
@@ -430,7 +430,7 @@ export const DashboardPage: React.FC = () => {
                     </div>
 
                     {totalRecentActivityPages > 1 && (
-                      <div className="mt-auto shrink-0 border-t border-slate-200 p-4">
+                      <div className="mt-auto shrink-0 border-t border-slate-200 p-4 ">
                         <Pagination
                           currentPage={recentActivitiesPage}
                           totalPages={totalRecentActivityPages}
