@@ -28,6 +28,7 @@ import {
   formatDate,
   formatHours,
   getWeekDates,
+  formatTime,
 } from "@/utils/helpers";
 
 export const DashboardPage: React.FC = () => {
@@ -36,13 +37,19 @@ export const DashboardPage: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [recentActivitiesPage, setRecentActivitiesPage] = useState(1);
   const [difficultiesPage, setDifficultiesPage] = useState(1);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // altura fixa final dos dois cards
   const [sharedCardsHeight, setSharedCardsHeight] = useState<number>(700);
 
-  // refs das páginas ocultas usadas para medir
   const hiddenRecentPagesRef = useRef<HTMLDivElement | null>(null);
   const hiddenDifficultiesPagesRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1280);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -142,7 +149,11 @@ export const DashboardPage: React.FC = () => {
     .filter((activity) => activity.date === today)
     .reduce(
       (sum, activity) =>
-        sum + calculateHours(activity.startTime, activity.endTime),
+        sum +
+        calculateHours(
+          formatTime(activity.startTime),
+          formatTime(activity.endTime),
+        ),
       0,
     );
 
@@ -150,7 +161,11 @@ export const DashboardPage: React.FC = () => {
     .filter((activity) => weekDates.includes(activity.date))
     .reduce(
       (sum, activity) =>
-        sum + calculateHours(activity.startTime, activity.endTime),
+        sum +
+        calculateHours(
+          formatTime(activity.startTime),
+          formatTime(activity.endTime),
+        ),
       0,
     );
 
@@ -208,6 +223,11 @@ export const DashboardPage: React.FC = () => {
 
   useLayoutEffect(() => {
     const measureAllPages = () => {
+      if (window.innerWidth < 1280) {
+        setSharedCardsHeight(0);
+        return;
+      }
+
       let maxHeight = 700;
 
       if (hiddenRecentPagesRef.current) {
@@ -366,10 +386,10 @@ export const DashboardPage: React.FC = () => {
           </Card>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-2">
+        <section className="grid grid-cols-1 gap-4 lg:gap-6 xl:grid-cols-2">
           <div
             className="flex w-full"
-            style={{ height: `${sharedCardsHeight}px` }}
+            style={{ height: isMobile ? "auto" : `${sharedCardsHeight}px` }}
           >
             <Card className="flex h-full w-full flex-col overflow-hidden">
               <CardHeader className="flex items-center justify-between gap-3">
@@ -427,31 +447,37 @@ export const DashboardPage: React.FC = () => {
 
           <div
             className="flex w-full"
-            style={{ height: `${sharedCardsHeight}px` }}
+            style={{ height: isMobile ? "auto" : `${sharedCardsHeight}px` }}
           >
             <Card className="flex h-full w-full flex-col overflow-hidden">
               <CardHeader className="shrink-0">
-                <CardTitle>Sinais de dificuldade</CardTitle>
+                <CardTitle className="text-base sm:text-lg">
+                  Sinais de dificuldade
+                </CardTitle>
               </CardHeader>
 
-              <CardBody className="flex flex-1 flex-col overflow-hidden p-0">
+              <CardBody
+                className={`flex flex-1 flex-col p-0${
+                  isMobile ? "overflow-visible" : "overflow-y-auto"
+                }`}
+              >
                 {report.difficulties.length === 0 ? (
-                  <div className="flex flex-1 items-center justify-center p-6">
-                    <div className="flex w-full max-w-md items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-600">
+                  <div className="flex flex-1 items-center justify-center p-4 sm:p-6">
+                    <div className="flex w-full max-w-md items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-center text-sm text-slate-600 sm:p-5">
                       Nenhum sinal de dificuldade detetado no período atual.
                     </div>
                   </div>
                 ) : (
                   <div className="flex flex-1 flex-col">
-                    <div className="flex flex-1 items-center">
-                      <div className="w-full space-y-3 pr-1">
+                    <div className="flex flex-1 items-start">
+                      <div className="w-full space-y-3 pr-0 sm:pr-1">
                         {paginatedDifficulties.map((signal) => (
                           <div
                             key={signal.id}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4"
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="text-sm font-semibold text-navy">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+                              <div className="break-words text-sm font-semibold text-navy">
                                 {signal.title}
                               </div>
 
@@ -460,7 +486,7 @@ export const DashboardPage: React.FC = () => {
                               </div>
                             </div>
 
-                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                            <p className="mt-2 break-words text-sm leading-6 text-slate-600">
                               {signal.description}
                             </p>
                           </div>
@@ -469,7 +495,7 @@ export const DashboardPage: React.FC = () => {
                     </div>
 
                     {totalDifficultiesPages > 1 && (
-                      <div className="shrink-0 border-t border-slate-200 p-4">
+                      <div className="shrink-0 border-t border-slate-200 p-3 sm:p-4">
                         <Pagination
                           currentPage={difficultiesPage}
                           totalPages={totalDifficultiesPages}
@@ -487,8 +513,11 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* área invisível só para medir todas as páginas */}
-      <div className="pointer-events-none absolute left-0 top-0 -z-10 opacity-0">
-        <div className="grid w-[calc(100vw-4rem)] max-w-[1400px] gap-6 xl:grid-cols-2">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed left-0 top-0 -z-10 h-0 w-screen overflow-hidden opacity-0"
+      >
+        <div className="grid w-full max-w-[1400px] gap-6 xl:grid-cols-2">
           <div ref={hiddenRecentPagesRef}>
             {allRecentPages.length === 0 ? (
               <div data-page-height className="w-full">
@@ -517,14 +546,12 @@ export const DashboardPage: React.FC = () => {
                     <CardHeader className="flex items-center justify-between gap-3">
                       <CardTitle>Atividades recentes</CardTitle>
                     </CardHeader>
-
                     <CardBody className="flex flex-col p-0">
-                      <div className="flex flex-col pr-1">
+                      <div className="flex flex-col pr-0 sm:pr-1">
                         {page.map((activity) => {
                           const actUser = users.find(
                             (item) => item.id === activity.userId,
                           );
-
                           return (
                             <ActivityItem
                               key={activity.id}
@@ -535,9 +562,8 @@ export const DashboardPage: React.FC = () => {
                           );
                         })}
                       </div>
-
                       {totalRecentActivityPages > 1 && (
-                        <div className="mt-auto shrink-0 border-t border-slate-200 p-4">
+                        <div className="mt-auto shrink-0 border-t border-slate-200 p-3 sm:p-4">
                           <Pagination
                             currentPage={pageIndex + 1}
                             totalPages={totalRecentActivityPages}
@@ -578,33 +604,29 @@ export const DashboardPage: React.FC = () => {
                     <CardHeader className="shrink-0">
                       <CardTitle>Sinais de dificuldade</CardTitle>
                     </CardHeader>
-
                     <CardBody className="flex flex-col">
-                      <div className="flex flex-col space-y-3 pr-1">
+                      <div className="flex flex-col space-y-3 pr-0 sm:pr-1">
                         {page.map((signal) => (
                           <div
                             key={signal.id}
-                            className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3 sm:p-4"
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
                               <div className="text-sm font-semibold text-navy">
                                 {signal.title}
                               </div>
-
                               <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                                 {signal.severity}
                               </div>
                             </div>
-
                             <p className="mt-2 text-sm leading-6 text-slate-600">
                               {signal.description}
                             </p>
                           </div>
                         ))}
                       </div>
-
                       {totalDifficultiesPages > 1 && (
-                        <div className="mt-auto shrink-0 border-t border-slate-200 pt-4">
+                        <div className="mt-auto shrink-0 border-t border-slate-200 pt-3 sm:pt-4">
                           <Pagination
                             currentPage={pageIndex + 1}
                             totalPages={totalDifficultiesPages}

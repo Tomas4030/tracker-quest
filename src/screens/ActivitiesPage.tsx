@@ -19,7 +19,12 @@ import {
 } from "@/components";
 import { useAppStore } from "@/store";
 import type { Activity, ActivityStatus } from "@/types";
-import { calculateHours, formatHours, getTodayString } from "@/utils/helpers";
+import {
+  calculateHours,
+  formatHours,
+  getTodayString,
+  formatTime,
+} from "@/utils/helpers";
 
 type ActivityTab = "todas" | "hoje";
 
@@ -95,8 +100,8 @@ export const ActivitiesPage: React.FC = () => {
     if (activity) {
       setEditingId(activity.id);
       setFormDate(activity.date);
-      setFormStartTime(activity.startTime);
-      setFormEndTime(activity.endTime);
+      setFormStartTime(formatTime(activity.startTime));
+      setFormEndTime(formatTime(activity.endTime));
       setFormTitle(activity.title);
       setFormDescription(activity.description || "");
       setFormStatus(activity.status);

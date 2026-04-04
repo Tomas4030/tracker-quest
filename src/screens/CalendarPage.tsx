@@ -26,32 +26,34 @@ import type {
   Project,
   User,
 } from "@/types";
-import {
-  getActivitiesForDate,
-} from "@/utils/analytics";
+import { getActivitiesForDate } from "@/utils/analytics";
 import {
   calculateHours,
   formatDate,
   formatHours,
   getTodayString,
+  formatTime
 } from "@/utils/helpers";
+
 
 function shiftDate(
   referenceDate: Date,
   view: CalendarViewMode,
   direction: -1 | 1,
 ): Date {
-  const next = new Date(referenceDate);
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth();
+  const day = referenceDate.getDate();
+
   if (view === "month") {
-    next.setMonth(next.getMonth() + direction);
-    return next;
+    return new Date(year, month + direction, 1);
   }
+
   if (view === "week") {
-    next.setDate(next.getDate() + direction * 7);
-    return next;
+    return new Date(year, month, day + direction * 7);
   }
-  next.setDate(next.getDate() + direction);
-  return next;
+
+  return new Date(year, month, day + direction);
 }
 
 export const CalendarPage: React.FC = () => {
@@ -63,6 +65,7 @@ export const CalendarPage: React.FC = () => {
     updateActivity,
     deleteActivity,
   } = useAppStore();
+
   const [users, setUsers] = useState<User[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [view, setView] = useState<CalendarViewMode>("month");
@@ -93,12 +96,15 @@ export const CalendarPage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
+
     const loadContext = async () => {
       await loadActivities(user.role === "admin" ? undefined : user.id);
+
       const [loadedUsers, loadedProjects] = await Promise.all([
         authService.loadAll(),
         projectService.loadAll(),
       ]);
+
       setUsers(loadedUsers);
       setProjects(loadedProjects);
     };
@@ -122,9 +128,8 @@ export const CalendarPage: React.FC = () => {
     return activities.filter((activity) => {
       if (!isAdmin && activity.userId !== user?.id) return false;
       if (filterUserId && activity.userId !== filterUserId) return false;
-      if (filterProjectId && activity.projectId !== filterProjectId) {
+      if (filterProjectId && activity.projectId !== filterProjectId)
         return false;
-      }
       if (filterStatus && activity.status !== filterStatus) return false;
       if (filterDate && activity.date !== filterDate) return false;
       return true;
@@ -146,7 +151,11 @@ export const CalendarPage: React.FC = () => {
 
   const selectedDayHours = selectedDayActivities.reduce(
     (total, activity) =>
-      total + calculateHours(activity.startTime, activity.endTime),
+      total +
+      calculateHours(
+        formatTime(activity.startTime),
+        formatTime(activity.endTime),
+      ),
     0,
   );
 
@@ -164,8 +173,8 @@ export const CalendarPage: React.FC = () => {
     if (activity) {
       setEditingId(activity.id);
       setFormDate(activity.date);
-      setFormStartTime(activity.startTime);
-      setFormEndTime(activity.endTime);
+      setFormStartTime(formatTime(activity.startTime));
+      setFormEndTime(formatTime(activity.endTime));
       setFormTitle(activity.title);
       setFormDescription(activity.description || "");
       setFormStatus(activity.status);
@@ -183,6 +192,7 @@ export const CalendarPage: React.FC = () => {
       setFormProjectId(projects[0]?.id || "");
       setFormUserId(user?.id || "");
     }
+
     setError(null);
     setIsModalOpen(true);
   };
@@ -245,7 +255,9 @@ export const CalendarPage: React.FC = () => {
         });
         setSuccess("Atividade criada com sucesso.");
       }
+
       setSelectedDate(formDate);
+
       setTimeout(() => {
         handleCloseModal();
         setSuccess(null);
@@ -259,6 +271,7 @@ export const CalendarPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Queres remover este registo?")) return;
+
     try {
       await deleteActivity(id);
       setSuccess("Atividade apagada com sucesso.");
@@ -277,24 +290,15 @@ export const CalendarPage: React.FC = () => {
       <Topbar title="Calendário de atividades" date={formatDate(new Date())} />
 
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
-        <div className="grid gap-4 sm:grid-cols-1 xl:grid-cols-1">
-          <Card className="flex min-h-[100px] flex-col">
-            <CardBody>
-              <div className="text-sm text-slate-500">Total visível</div>
-              <div className="mt-2 text-2xl font-semibold text-navy">
-                {visibleActivities.length}
-              </div>
-            </CardBody>
-          </Card>
-        </div>
-
         <Card>
           <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <CardTitle>Controlos do calendário</CardTitle>
+
             <div className="flex flex-wrap gap-2">
               {(["day", "week", "month"] as CalendarViewMode[]).map((item) => (
                 <button
                   key={item}
+                  type="button"
                   onClick={() => setView(item)}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     view === item
@@ -402,7 +406,9 @@ export const CalendarPage: React.FC = () => {
           }}
           onSelectDate={(dateKey) => {
             setSelectedDate(dateKey);
-            setReferenceDate(new Date(`${dateKey}T00:00:00`));
+
+            const [year, month, day] = dateKey.split("-").map(Number);
+            setReferenceDate(new Date(year, month - 1, day));
           }}
           onCreateActivity={(dateKey) => handleOpenModal(undefined, dateKey)}
         />
@@ -452,8 +458,8 @@ export const CalendarPage: React.FC = () => {
                               <span className="text-xs font-mono text-slate-500">
                                 {formatHours(
                                   calculateHours(
-                                    activity.startTime,
-                                    activity.endTime,
+                                    formatTime(activity.startTime),
+                                    formatTime(activity.endTime),
                                   ),
                                 )}
                               </span>
@@ -507,6 +513,7 @@ export const CalendarPage: React.FC = () => {
               <CardHeader>
                 <CardTitle>Detalhe do dia</CardTitle>
               </CardHeader>
+
               <CardBody className="space-y-3">
                 {selectedActivity && (
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -535,25 +542,6 @@ export const CalendarPage: React.FC = () => {
                     {selectedDayActivities.length}
                   </div>
                 </div>
-
-                <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                  O calendário destaca o contexto do trabalho e facilita a
-                  leitura por dia, semana e mês.
-                </div>
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Gerar registo</CardTitle>
-              </CardHeader>
-              <CardBody>
-                <Button
-                  className="w-full"
-                  onClick={() => handleOpenModal(undefined, selectedDate)}
-                >
-                  Criar nova atividade
-                </Button>
               </CardBody>
             </Card>
           </div>

@@ -105,8 +105,8 @@ class ActivityService {
         title: activity.title,
         description: activity.description,
         date: activity.date,
-        start_time: activity.startTime,
-        end_time: activity.endTime,
+        start_time: formatTime(activity.startTime),
+        end_time: formatTime(activity.endTime),
         status: activity.status,
       })
       .select("*")

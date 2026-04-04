@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogOut, Menu, X } from "lucide-react";
@@ -21,13 +21,57 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggle,
 }) => {
   const pathname = usePathname();
+  const [showMobileButton, setShowMobileButton] = useState(true);
+
+  useEffect(() => {
+    let hideTimeout: ReturnType<typeof setTimeout> | null = null;
+    const hideDelay = 2200;
+
+    const setActive = () => {
+      setShowMobileButton(true);
+
+      if (hideTimeout) {
+        clearTimeout(hideTimeout);
+      }
+
+      hideTimeout = setTimeout(() => {
+        if (!isOpen) {
+          setShowMobileButton(false);
+        }
+      }, hideDelay);
+    };
+
+    const events: Array<keyof WindowEventMap> = [
+      "scroll",
+      "mousemove",
+      "touchstart",
+      "touchmove",
+      "keydown",
+    ];
+
+    setActive();
+
+    events.forEach((eventName) => {
+      window.addEventListener(eventName, setActive, { passive: true });
+    });
+
+    return () => {
+      if (hideTimeout) {
+        clearTimeout(hideTimeout);
+      }
+
+      events.forEach((eventName) => {
+        window.removeEventListener(eventName, setActive);
+      });
+    };
+  }, [isOpen]);
 
   if (!user) return null;
 
   const navItems = [
     { path: "/dashboard", label: "Dashboard", icon: "⊞" },
     { path: "/calendar", label: "Calendário", icon: "🗓" },
-    
+
     { path: "/register", label: "Registar horas", icon: "⏱" },
     ...(user.role === "admin"
       ? [
@@ -46,7 +90,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Mobile Menu Button */}
       <button
         onClick={onToggle}
-        className="fixed top-4 left-4 z-40 md:hidden bg-white border border-slate-200 rounded-lg p-2 hover:bg-slate-50"
+        className={`fixed left-4 top-4 z-40 rounded-lg border border-slate-200 bg-white p-2 transition-all duration-300 hover:bg-slate-50 md:hidden ${
+          showMobileButton || isOpen
+            ? "translate-y-0 opacity-100"
+            : "-translate-y-2 opacity-0 pointer-events-none"
+        }`}
       >
         {isOpen ? <X size={20} /> : <Menu size={20} />}
       </button>

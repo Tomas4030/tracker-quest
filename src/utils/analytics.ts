@@ -160,7 +160,10 @@ export function buildSmartReport(params: {
   } = params;
   const orderedActivities = getSortedActivities(activities);
   const totalHours = sumBy(orderedActivities, (activity) =>
-    calculateHours(activity.startTime, activity.endTime),
+    calculateHours(
+      formatTime(activity.startTime),
+      formatTime(activity.endTime),
+    ),
   );
   const completedTasks = orderedActivities.filter(
     (activity) => activity.status === "concluido",
@@ -175,7 +178,11 @@ export function buildSmartReport(params: {
     label: DAY_LABELS[parseDateKey(dateKey).getDay()],
     hours: sumBy(
       orderedActivities.filter((activity) => activity.date === dateKey),
-      (activity) => calculateHours(activity.startTime, activity.endTime),
+      (activity) =>
+        calculateHours(
+          formatTime(activity.startTime),
+          formatTime(activity.endTime),
+        ),
     ),
     tasks: dailyCounts[dateKey] || 0,
   }));
@@ -183,12 +190,17 @@ export function buildSmartReport(params: {
   const hourlyCounts = HOUR_BUCKETS.map((hour) => {
     const nextHour = `${String(Number(hour.slice(0, 2)) + 1).padStart(2, "0")}:00`;
     const bucketActivities = orderedActivities.filter(
-      (activity) => activity.startTime >= hour && activity.startTime < nextHour,
+      (activity) =>
+        formatTime(activity.startTime) >= hour &&
+        formatTime(activity.startTime) < nextHour,
     );
     return {
       label: hour,
       hours: sumBy(bucketActivities, (activity) =>
-        calculateHours(activity.startTime, activity.endTime),
+        calculateHours(
+          formatTime(activity.startTime),
+          formatTime(activity.endTime),
+        ),
       ),
       tasks: bucketActivities.length,
     } satisfies ProductivityPoint;
@@ -201,7 +213,10 @@ export function buildSmartReport(params: {
         activity.projectName === project.name,
     );
     const hours = sumBy(projectActivities, (activity) =>
-      calculateHours(activity.startTime, activity.endTime),
+      calculateHours(
+        formatTime(activity.startTime),
+        formatTime(activity.endTime),
+      ),
     );
     return {
       projectId: project.id,
@@ -240,14 +255,22 @@ export function buildSmartReport(params: {
 
   const weeklyTotal = sumBy(
     orderedActivities.filter((activity) => weekDates.includes(activity.date)),
-    (activity) => calculateHours(activity.startTime, activity.endTime),
+    (activity) =>
+      calculateHours(
+        formatTime(activity.startTime),
+        formatTime(activity.endTime),
+      ),
   );
 
   const monthlyTotal = sumBy(
     orderedActivities.filter((activity) =>
       activity.date.startsWith(referenceDate.toISOString().slice(0, 7)),
     ),
-    (activity) => calculateHours(activity.startTime, activity.endTime),
+    (activity) =>
+      calculateHours(
+        formatTime(activity.startTime),
+        formatTime(activity.endTime),
+      ),
   );
 
   return {
@@ -281,19 +304,25 @@ export function detectDifficultySignals(
   const averageDuration =
     activities.length > 0
       ? sumBy(activities, (activity) =>
-          calculateHours(activity.startTime, activity.endTime),
+          calculateHours(
+            formatTime(activity.startTime),
+            formatTime(activity.endTime),
+          ),
         ) / activities.length
       : 0;
 
   activities.forEach((activity) => {
-    const duration = calculateHours(activity.startTime, activity.endTime);
+    const duration = calculateHours(
+      formatTime(activity.startTime),
+      formatTime(activity.endTime),
+    );
     if (duration >= Math.max(averageDuration * 1.5, 5)) {
       signals.push({
         id: `duration-${activity.id}`,
         activityId: activity.id,
         userId: activity.userId,
         title: "Atividade acima do tempo habitual",
-        description: `${activity.title} decorreu durante ${formatHours(duration)} (${formatTimeRange(activity.startTime, activity.endTime)}).`,
+        description: `${activity.title} decorreu durante ${formatHours(duration)} (${formatTimeRange(formatTime(activity.startTime), formatTime(activity.endTime))}).`,
         severity: duration >= 6 ? "high" : "medium",
         category: "duration",
       });
@@ -311,13 +340,13 @@ export function detectDifficultySignals(
       });
     }
 
-    if (Number(activity.startTime.slice(0, 2)) >= 11) {
+    if (Number(formatTime(activity.startTime).slice(0, 2)) >= 11) {
       signals.push({
         id: `delay-${activity.id}`,
         activityId: activity.id,
         userId: activity.userId,
         title: "Início tardio registado",
-        description: `${activity.title} começou às ${activity.startTime}, acima da janela ideal para acompanhamento diário.`,
+        description: `${activity.title} começou às ${formatTime(activity.startTime)}, acima da janela ideal para acompanhamento diário.`,
         severity: "low",
         category: "timing",
       });
@@ -336,7 +365,11 @@ export function detectDifficultySignals(
           activity.projectName === projectKey ||
           activity.title === projectKey,
       ),
-      (activity) => calculateHours(activity.startTime, activity.endTime),
+      (activity) =>
+        calculateHours(
+          formatTime(activity.startTime),
+          formatTime(activity.endTime),
+        ),
     );
     if (count >= 4 && projectHours <= 8) {
       const project = projects.find(
@@ -451,7 +484,10 @@ function projectWithMostHours(
       projectId: project.id,
       projectName: project.name,
       hours: sumBy(projectActivities, (activity) =>
-        calculateHours(activity.startTime, activity.endTime),
+        calculateHours(
+          formatTime(activity.startTime),
+          formatTime(activity.endTime),
+        ),
       ),
       tasks: projectActivities.length,
       percentage: 0,
@@ -469,7 +505,10 @@ function getBusiestDay(activities: Activity[]): ProductivityPoint | null {
         hours: 0,
         tasks: 0,
       };
-      current.hours += calculateHours(activity.startTime, activity.endTime);
+      current.hours += calculateHours(
+        formatTime(activity.startTime),
+        formatTime(activity.endTime),
+      );
       current.tasks += 1;
       accumulator[activity.date] = current;
       return accumulator;
@@ -546,7 +585,7 @@ export function getCalendarLabel(
 }
 
 export function getCalendarActivityLabel(activity: Activity): string {
-  return `${formatShortTime(activity.startTime)} - ${formatShortTime(activity.endTime)}`;
+  return `${formatShortTime(formatTime(activity.startTime))} - ${formatShortTime(formatTime(activity.endTime))}`;
 }
 
 export function getMonthCalendar(referenceDate = new Date()): Date[] {

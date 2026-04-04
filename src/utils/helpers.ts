@@ -98,8 +98,12 @@ export function truncateText(text: string, length: number): string {
 /**
  * Format time range
  */
-export function formatTimeRange(startTime: string, endTime: string): string {
-  return `${startTime}–${endTime}`;
+export function formatTime(time: string): string {
+  if (!time) return "";
+
+  const [hours, minutes] = time.split(":");
+
+  return `${hours}:${minutes}`;
 }
 
 /**

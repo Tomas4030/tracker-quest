@@ -32,7 +32,7 @@ import {
 } from "@/services";
 import { useAppStore } from "@/store";
 import type { Activity, Project, Team, User, UserRole } from "@/types";
-import { calculateHours, formatHours } from "@/utils/helpers";
+import { calculateHours, formatHours,formatTime } from "@/utils/helpers";
 
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: "estagiario", label: "Estagiário" },
@@ -171,7 +171,11 @@ export const AdminOverviewPage: React.FC = () => {
 
   const totalHours = filteredActivities.reduce(
     (sum, activity) =>
-      sum + calculateHours(activity.startTime, activity.endTime),
+      sum +
+      calculateHours(
+        formatTime(activity.startTime),
+        formatTime(activity.endTime),
+      ),
     0,
   );
   const activeInterns = filteredUsers.filter(
@@ -513,7 +517,11 @@ export const AdminOverviewPage: React.FC = () => {
               );
               const memberHours = memberActivities.reduce(
                 (sum, activity) =>
-                  sum + calculateHours(activity.startTime, activity.endTime),
+                  sum +
+                  calculateHours(
+                    formatTime(activity.startTime),
+                    formatTime(activity.endTime),
+                  ),
                 0,
               );
               return (

@@ -3,18 +3,9 @@
 import React from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { Activity, CalendarViewMode, Project, User } from "@/types";
-import {
-  getActivitiesForDate,
-  getActivitiesForMonth,
-  getActivitiesForWeek,
-  getCalendarActivityLabel,
-  getCalendarDates,
-  getCalendarLabel,
-  isSameCalendarMonth,
-  isToday,
-} from "@/utils/analytics";
 import { formatHours, calculateHours, getStatusLabel } from "@/utils/helpers";
 import { Badge, Button } from ".";
+import { formatTime } from "@/utils/helpers";
 
 interface CalendarBoardProps {
   view: CalendarViewMode;
@@ -38,8 +29,20 @@ function getProjectColor(activity: Activity, projects: Project[]): string {
   return project?.color || "#1a56db";
 }
 
+function pad(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+/**
+ * IMPORTANTE:
+ * Não usar toISOString() aqui porque converte para UTC
+ * e pode mudar o dia dependendo do timezone.
+ */
 function formatDateKey(date: Date): string {
-  return date.toISOString().split("T")[0];
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  return `${year}-${month}-${day}`;
 }
 
 function getDayTitle(date: Date): string {
@@ -47,7 +50,133 @@ function getDayTitle(date: Date): string {
     weekday: "long",
     day: "numeric",
     month: "long",
+    year: "numeric",
   });
+}
+
+function getCalendarLabel(view: CalendarViewMode, referenceDate: Date): string {
+  if (view === "month") {
+    return referenceDate.toLocaleDateString("pt-PT", {
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  if (view === "week") {
+    const dates = getWeekDates(referenceDate);
+    const first = dates[0];
+    const last = dates[6];
+
+    const firstLabel = first.toLocaleDateString("pt-PT", {
+      day: "numeric",
+      month: "short",
+    });
+    const lastLabel = last.toLocaleDateString("pt-PT", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+
+    return `${firstLabel} — ${lastLabel}`;
+  }
+
+  return referenceDate.toLocaleDateString("pt-PT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function isToday(dateKey: string): boolean {
+  const now = new Date();
+  return dateKey === formatDateKey(now);
+}
+
+function isSameCalendarMonth(date: Date, referenceDate: Date): boolean {
+  return (
+    date.getMonth() === referenceDate.getMonth() &&
+    date.getFullYear() === referenceDate.getFullYear()
+  );
+}
+
+function getCalendarActivityLabel(activity: Activity): string {
+  return `${formatTime(formatTime(activity.startTime))} - ${formatTime(formatTime(activity.endTime))}`;
+}
+
+function getActivitiesForDate(
+  activities: Activity[],
+  dateKey: string,
+): Activity[] {
+  return activities
+    .filter((activity) => activity.date === dateKey)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+}
+
+function getActivitiesForMonth(
+  activities: Activity[],
+  referenceDate: Date,
+): Activity[] {
+  const month = referenceDate.getMonth();
+  const year = referenceDate.getFullYear();
+
+  return activities.filter((activity) => {
+    const [activityYear, activityMonth] = activity.date.split("-").map(Number);
+    return activityYear === year && activityMonth === month + 1;
+  });
+}
+
+function getWeekDates(referenceDate: Date): Date[] {
+  const base = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate(),
+  );
+
+  const jsDay = base.getDay(); // 0=Dom, 1=Seg...
+  const mondayOffset = jsDay === 0 ? -6 : 1 - jsDay;
+
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + mondayOffset);
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const current = new Date(monday);
+    current.setDate(monday.getDate() + index);
+    return current;
+  });
+}
+
+/**
+ * Aqui está a correção principal para o modo mês:
+ * gera APENAS os dias do mês atual.
+ * Nada de dias do mês anterior/seguinte.
+ */
+function getMonthDates(referenceDate: Date): Date[] {
+  const year = referenceDate.getFullYear();
+  const month = referenceDate.getMonth();
+  const totalDays = new Date(year, month + 1, 0).getDate();
+
+  return Array.from({ length: totalDays }, (_, index) => {
+    return new Date(year, month, index + 1);
+  });
+}
+
+function getCalendarDates(view: CalendarViewMode, referenceDate: Date): Date[] {
+  if (view === "day") {
+    return [
+      new Date(
+        referenceDate.getFullYear(),
+        referenceDate.getMonth(),
+        referenceDate.getDate(),
+      ),
+    ];
+  }
+
+  if (view === "week") {
+    return getWeekDates(referenceDate);
+  }
+
+  return getMonthDates(referenceDate);
 }
 
 export const CalendarBoard: React.FC<CalendarBoardProps> = ({
@@ -76,6 +205,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
     return (
       <button
         key={activity.id}
+        type="button"
         onClick={() => onSelectActivity?.(activity)}
         className="group flex w-full flex-col rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
         style={{
@@ -85,26 +215,33 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-slate-900 truncate-2">
+            <div className="truncate text-sm font-semibold text-slate-900">
               {activity.title}
             </div>
             <div className="mt-1 text-xs text-slate-500">
               {user?.name || "Sem utilizador"}
             </div>
           </div>
-          <div className="text-[11px] font-mono text-slate-500 whitespace-nowrap">
+          <div className="whitespace-nowrap text-[11px] font-mono text-slate-500">
             {getCalendarActivityLabel(activity)}
           </div>
         </div>
+
         {activity.description && (
-          <p className="mt-2 text-xs leading-5 text-slate-600 truncate-2">
+          <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">
             {activity.description}
           </p>
         )}
+
         <div className="mt-3 flex items-center justify-between gap-2">
           <Badge status={activity.status} />
           <span className="text-xs font-mono text-slate-500">
-            {formatHours(calculateHours(activity.startTime, activity.endTime))}
+            {formatHours(
+              calculateHours(
+                formatTime(activity.startTime),
+                formatTime(activity.endTime),
+              ),
+            )}
           </span>
         </div>
       </button>
@@ -118,21 +255,26 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
           <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
             Calendário
           </div>
-          <h2 className="mt-1 text-xl font-semibold text-navy">
+          <h2 className="mt-1 text-xl font-semibold text-navy capitalize">
             {calendarLabel}
           </h2>
         </div>
+
         <div className="flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={onToday}>
             Hoje
           </Button>
+
           <button
+            type="button"
             onClick={onPrevious}
             className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-700 transition hover:bg-slate-100"
           >
             <ChevronLeft size={18} />
           </button>
+
           <button
+            type="button"
             onClick={onNext}
             className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-700 transition hover:bg-slate-100"
           >
@@ -153,7 +295,9 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                   Lista completa de atividades do dia
                 </div>
               </div>
+
               <button
+                type="button"
                 onClick={() => onCreateActivity?.(formatDateKey(referenceDate))}
                 className="inline-flex items-center gap-2 rounded-xl bg-navy px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800"
               >
@@ -161,6 +305,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                 Nova
               </button>
             </div>
+
             <div className="space-y-3">
               {getActivitiesForDate(
                 activities,
@@ -168,6 +313,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
               ).map((activity) => (
                 <div key={activity.id}>{renderActivityChip(activity)}</div>
               ))}
+
               {getActivitiesForDate(activities, formatDateKey(referenceDate))
                 .length === 0 && (
                 <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
@@ -176,8 +322,10 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
               )}
             </div>
           </div>
+
           <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
             <div className="text-sm font-semibold text-navy">Resumo rápido</div>
+
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-2xl bg-slate-50 p-3">
                 <div className="text-slate-500">Total de atividades</div>
@@ -190,6 +338,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                   }
                 </div>
               </div>
+
               <div className="rounded-2xl bg-slate-50 p-3">
                 <div className="text-slate-500">Horas previstas</div>
                 <div className="mt-1 text-lg font-semibold text-navy">
@@ -200,13 +349,17 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                     ).reduce(
                       (total, activity) =>
                         total +
-                        calculateHours(activity.startTime, activity.endTime),
+                        calculateHours(
+                          formatTime(activity.startTime),
+                          formatTime(activity.endTime),
+                        ),
                       0,
                     ),
                   )}
                 </div>
               </div>
             </div>
+
             <div className="rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
               Clique numa atividade para abrir detalhes e edição rápida.
             </div>
@@ -218,19 +371,24 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
         <div className="grid gap-3 p-4 md:grid-cols-7">
           {dates.map((date) => {
             const dateKey = formatDateKey(date);
-            const dayActivities = getActivitiesForWeek(
-              activities,
-              referenceDate,
-            ).filter((activity) => activity.date === dateKey);
+            const dayActivities = activities
+              .filter((activity) => activity.date === dateKey)
+              .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
             const dayHours = dayActivities.reduce(
               (total, activity) =>
-                total + calculateHours(activity.startTime, activity.endTime),
+                total +
+                calculateHours(
+                  formatTime(activity.startTime),
+                  formatTime(activity.endTime),
+                ),
               0,
             );
 
             return (
               <button
                 key={dateKey}
+                type="button"
                 onClick={() => onSelectDate?.(dateKey)}
                 className={`rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
                   isToday(dateKey)
@@ -244,6 +402,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                   </div>
                   <div className="text-xs text-slate-500">{date.getDate()}</div>
                 </div>
+
                 <div className="mt-3 space-y-2">
                   {dayActivities.slice(0, 3).map((activity) => (
                     <div
@@ -258,7 +417,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                         borderLeftWidth: 4,
                       }}
                     >
-                      <div className="font-medium truncate-2">
+                      <div className="line-clamp-2 font-medium">
                         {activity.title}
                       </div>
                       <div className="mt-1 text-[11px] text-slate-500">
@@ -267,12 +426,14 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                       </div>
                     </div>
                   ))}
+
                   {dayActivities.length > 3 && (
                     <div className="text-xs text-slate-500">
                       + {dayActivities.length - 3} atividades
                     </div>
                   )}
                 </div>
+
                 <div className="mt-3 text-xs font-mono text-slate-500">
                   {formatHours(dayHours)}
                 </div>
@@ -291,28 +452,32 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
               </div>
             ))}
           </div>
+
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
             {dates.map((date) => {
               const dateKey = formatDateKey(date);
-              const dayActivities = getActivitiesForMonth(
-                activities,
-                referenceDate,
-              ).filter((activity) => activity.date === dateKey);
+              const dayActivities = activities
+                .filter((activity) => activity.date === dateKey)
+                .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
               const dayHours = dayActivities.reduce(
                 (total, activity) =>
-                  total + calculateHours(activity.startTime, activity.endTime),
+                  total +
+                  calculateHours(
+                    formatTime(activity.startTime),
+                    formatTime(activity.endTime),
+                  ),
                 0,
               );
 
               return (
                 <button
                   key={dateKey}
+                  type="button"
                   onClick={() => onSelectDate?.(dateKey)}
-                  className={`min-h-32 rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
-                    isSameCalendarMonth(date, referenceDate)
-                      ? "border-slate-200 bg-white"
-                      : "border-slate-100 bg-slate-50 text-slate-400"
-                  } ${isToday(dateKey) ? "ring-2 ring-primary-200" : ""}`}
+                  className={`min-h-32 rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                    isToday(dateKey) ? "ring-2 ring-primary-200" : ""
+                  }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-semibold">
@@ -322,6 +487,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                       {formatHours(dayHours)}
                     </div>
                   </div>
+
                   <div className="mt-3 space-y-2">
                     {dayActivities.slice(0, 2).map((activity) => (
                       <div
@@ -336,7 +502,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                           borderLeftWidth: 4,
                         }}
                       >
-                        <div className="truncate-2 font-medium text-slate-700">
+                        <div className="line-clamp-2 font-medium text-slate-700">
                           {activity.title}
                         </div>
                         <div className="mt-1 text-[11px] text-slate-500">
@@ -344,6 +510,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                         </div>
                       </div>
                     ))}
+
                     {dayActivities.length > 2 && (
                       <div className="text-[11px] text-slate-500">
                         + {dayActivities.length - 2} mais
@@ -354,6 +521,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
               );
             })}
           </div>
+
           <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
             <div>
               {getActivitiesForMonth(activities, referenceDate).length}{" "}
@@ -364,7 +532,10 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                 getActivitiesForMonth(activities, referenceDate).reduce(
                   (total, activity) =>
                     total +
-                    calculateHours(activity.startTime, activity.endTime),
+                    calculateHours(
+                      formatTime(activity.startTime),
+                      formatTime(activity.endTime),
+                    ),
                   0,
                 ),
               )}

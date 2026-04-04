@@ -95,7 +95,13 @@ class ReportService {
     const requestPayload = await getLocalPayload(payload);
 
     const totalHours = requestPayload.activities.reduce((sum, activity) => {
-      return sum + getActivityHours(activity.startTime, activity.endTime);
+      return (
+        sum +
+        getActivityHours(
+          formatTime(activity.startTime),
+          formatTime(activity.endTime),
+        )
+      );
     }, 0);
 
     const completedTasks = requestPayload.activities.filter(

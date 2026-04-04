@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { ReportRequestPayload, SmartReport } from "@/types";
 import { buildSmartReport } from "@/utils/analytics";
-import { calculateHours } from "@/utils/helpers";
+import { calculateHours, formatTime } from "@/utils/helpers";
 
 function isSmartReport(value: unknown): value is SmartReport {
   if (!value || typeof value !== "object") return false;
@@ -38,8 +38,8 @@ async function generateWithGroq(
     const name = project?.name || "Sem projeto";
     if (!projectMap[key]) projectMap[key] = { hours: 0, tasks: 0, name };
     projectMap[key].hours += calculateHours(
-      activity.startTime,
-      activity.endTime,
+      formatTime(activity.startTime),
+      formatTime(activity.endTime),
     );
     projectMap[key].tasks += 1;
   }

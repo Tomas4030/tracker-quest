@@ -1,6 +1,6 @@
 import React from "react";
 import { Activity } from "@/types";
-import { calculateHours, formatHours } from "@/utils/helpers";
+import { calculateHours, formatHours,formatTime } from "@/utils/helpers";
 import { Badge } from "./Badge";
 import { Edit2, Trash2 } from "lucide-react";
 
@@ -31,10 +31,13 @@ export const ActivityItem: React.FC<ActivityItemProps> = ({
   onEdit,
   onDelete,
 }) => {
-  const hours = calculateHours(activity.startTime, activity.endTime);
+  const hours = calculateHours(
+    formatTime(activity.startTime),
+    formatTime(activity.endTime),
+  );
   const formattedDate = formatSimpleDate(activity.date);
-  const formattedStartTime = formatSimpleTime(activity.startTime);
-  const formattedEndTime = formatSimpleTime(activity.endTime);
+  const formattedStartTime = formatSimpleTime(formatTime(activity.startTime));
+  const formattedEndTime = formatSimpleTime(formatTime(activity.endTime));
 
   return (
     <div className="group flex gap-4 border-b border-slate-200 p-4 transition-colors last:border-b-0 hover:bg-slate-50">

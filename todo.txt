@@ -1,0 +1,40 @@
+# Tracker Quest - TODO Melhorada
+
+## 🔥 Prioridade Alta (fazer primeiro)
+- [ ] Corrigir bugs de criação de conta no Admin Overview (validação, mensagens de erro, fluxo completo até guardar).
+- [ ] Rever e estabilizar layouts com paginação (Dashboard + Admin Overview) para evitar saltos visuais.
+- [ ] Uniformizar UI dos formulários principais (Register, Admin Overview, Login): espaçamentos, estados de erro e labels.
+- [ ] Garantir que todos os componentes críticos têm estado vazio correto (sem texto solto, sem elementos fora de lugar).
+
+## ⚙️ Prioridade Média (melhorias importantes)
+- [ ] Dashboard: rever emojis e ícones para consistência visual entre cards.
+- [ ] Calendário: corrigir emojis/ícones e alinhar com o mesmo padrão do dashboard.
+- [ ] Register: escolher ícones/emoji coerentes e melhorar feedback de validação em tempo real.
+- [ ] Admin Report: melhorar layout geral (hierarquia visual, espaçamento, responsividade mobile).
+- [ ] Rever copy dos botões e títulos para manter linguagem consistente em PT-PT.
+
+## 🧹 Qualidade e manutenção
+- [ ] Criar checklist de UI por página (desktop/tablet/mobile) para validar cada release.
+- [ ] Remover código morto/duplicado em páginas com muitos blocos repetidos.
+- [ ] Garantir acessibilidade mínima nos componentes: aria-label, foco visível, contraste.
+- [ ] Rever paginação reutilizável em todos os ecrãs longos para evitar overflow e inconsistências.
+
+## 🚀 Funcionalidades novas que podes adicionar
+- [ ] Filtros avançados no Dashboard (por equipa, projeto, estado, intervalo de datas).
+- [ ] Exportar relatórios (PDF/CSV) no Admin Report.
+- [ ] Notificações internas para tarefas pendentes e atividades atrasadas.
+- [ ] Histórico de ações do admin (auditoria: quem criou/alterou contas e quando).
+- [ ] Objetivos semanais por estagiário com progresso visual.
+- [ ] Comparação entre períodos (esta semana vs semana passada).
+
+## ✅ Quick wins (1-2h cada)
+- [ ] Padronizar todos os botões principais para mesmo tamanho e alinhamento.
+- [ ] Adicionar skeleton/loading states onde hoje só aparece vazio.
+- [ ] Melhorar mensagens de sucesso/erro com texto mais claro.
+- [ ] Rever placeholders de inputs para linguagem consistente.
+
+## 🗺️ Próximos passos sugeridos
+1. Fechar bugs de Admin Overview + criação de conta.
+2. Finalizar consistência visual (Dashboard/Calendário/Register).
+3. Atacar Admin Report (UI + exportação).
+4. Implementar 1 funcionalidade nova de alto impacto (ex: export CSV).
