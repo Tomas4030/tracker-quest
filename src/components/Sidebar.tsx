@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { LogOut, Menu, X } from "lucide-react";
 import type { User } from "@/types";
 import { getInitials } from "@/utils/helpers";
-import { AccountSettingsModal } from "./AccountSettingsModal";
 
 interface SidebarProps {
   user: User | null;
@@ -140,7 +139,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <div className="min-w-0">
                 <p className="font-medium truncate">{user.name}</p>
-                <p className="text-sm text-white/60 truncate uppercase">{user.role}</p>
+                <p className="text-sm text-white/60 truncate uppercase">
+                  {user.role}
+                </p>
               </div>
             </div>
           </button>

@@ -361,17 +361,25 @@ export const AdminOverviewPage: React.FC = () => {
       if (editingUserId) {
         await authService.updateUser(editingUserId, payload);
       } else {
-        await authService.createAccount({
-          name: payload.name,
-          email: payload.email,
-          password: formPassword.trim() || createTempPassword(formName),
-          role: payload.role,
-          active: payload.active,
-          teamId: payload.teamId,
-          projectIds: payload.projectIds,
-          company: payload.company,
-          groupCode: payload.groupCode,
+        const response = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: payload.name,
+            email: payload.email,
+            password: formPassword.trim() || createTempPassword(formName),
+            role: payload.role,
+            active: payload.active,
+            teamId: payload.teamId,
+            projectIds: payload.projectIds,
+            company: payload.company,
+            groupCode: payload.groupCode,
+          }),
         });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Erro ao criar conta");
+        }
       }
 
       setSuccess(
@@ -393,7 +401,9 @@ export const AdminOverviewPage: React.FC = () => {
 
   const toggleUserActive = async (user: User) => {
     try {
-      await authService.toggleUserActive(user.id, user.active === false);
+      await authService.updateUser(user.id, {
+        active: user.active === false,
+      });
       await refreshData();
       setSuccess(
         user.active === false ? "Conta ativada." : "Conta desativada.",
