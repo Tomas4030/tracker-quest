@@ -12,7 +12,6 @@ interface SidebarProps {
   onLogout: () => void;
   isOpen: boolean;
   onToggle: () => void;
-  onUserUpdated?: (user: User) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -20,7 +19,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   isOpen,
   onToggle,
-  onUserUpdated,
 }) => {
   const pathname = usePathname();
   const [showMobileButton, setShowMobileButton] = useState(true);
