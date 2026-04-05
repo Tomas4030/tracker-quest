@@ -136,9 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <div className="min-w-0">
                 <p className="font-medium truncate">{user.name}</p>
-                <p className="text-sm text-white/60 truncate uppercase">
-                  {user.role}
-                </p>
+                <p className="text-sm text-white/60 truncate">{user.role}</p>
               </div>
             </div>
           </button>

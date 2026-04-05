@@ -3,7 +3,7 @@ import { supabase } from "./supabase";
 import { teamService } from "./teamService";
 import { projectService } from "./projectService";
 
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.toLowerCase();
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -31,8 +31,9 @@ class AuthService {
       teamName: team?.name || user.teamName,
       company: team?.company || user.company,
       groupCode: team?.groupCode || user.groupCode,
-      projectIds:
-        user.projectIds || enrichedProjects.map((project) => project.id),
+      projectIds: user.projectIds?.length
+        ? user.projectIds
+        : enrichedProjects.map((project) => project.id),
     };
   }
 
@@ -163,7 +164,9 @@ class AuthService {
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
 
-    localStorage.removeItem("estagio_current_user");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("estagio_current_user");
+    }
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
@@ -201,35 +204,6 @@ class AuthService {
     if (current?.id === id) this._persistCurrentUser(mapped);
 
     return mapped;
-  }
-
-  async uploadAvatar(file: File, userId: string): Promise<string> {
-    if (!supabase) throw new Error("Supabase não configurado.");
-
-    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
-    const filePath = `${userId}/avatar-${Date.now()}.${extension}`;
-    const bucketName = "avatars";
-
-    const { error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(filePath, file, { upsert: true });
-
-    if (uploadError) {
-      throw new Error(`Erro no upload do avatar: ${uploadError.message}`);
-    }
-
-    const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-
-    if (!data?.publicUrl) {
-      throw new Error("Erro ao obter URL pública da imagem.");
-    }
-
-    return data.publicUrl;
-  }
-
-  async updateAvatar(userId: string, file: File): Promise<User> {
-    const avatarUrl = await this.uploadAvatar(file, userId);
-    return this.updateUser(userId, { avatarUrl });
   }
 
   async sendPasswordResetEmail(email: string): Promise<void> {

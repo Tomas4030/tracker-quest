@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Modal } from "./Modal";
 import { authService } from "@/services/authService";
 import type { User } from "@/types";
@@ -20,7 +20,7 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   onUserUpdated,
 }) => {
   const [name, setName] = useState(user.name);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl || "");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -29,10 +29,16 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const previewUrl = useMemo(() => {
-    if (selectedFile) return URL.createObjectURL(selectedFile);
-    return user.avatarUrl || null;
-  }, [selectedFile, user.avatarUrl]);
+  useEffect(() => {
+    if (isOpen) {
+      setName(user.name);
+      setAvatarUrl(user.avatarUrl || "");
+      setNewPassword("");
+      setConfirmPassword("");
+      setMessage(null);
+      setError(null);
+    }
+  }, [isOpen, user]);
 
   const resetFeedback = () => {
     setMessage(null);
@@ -44,21 +50,15 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
       resetFeedback();
       setIsSavingProfile(true);
 
-      let updatedUser = user;
+      const cleanedAvatarUrl = avatarUrl.trim();
 
-      if (name.trim() !== user.name) {
-        updatedUser = await authService.updateUser(user.id, {
-          name: name.trim(),
-        });
-      }
-
-      if (selectedFile) {
-        updatedUser = await authService.updateAvatar(user.id, selectedFile);
-      }
+      const updatedUser = await authService.updateUser(user.id, {
+        name: name.trim(),
+        avatarUrl: cleanedAvatarUrl || undefined,
+      });
 
       onUserUpdated(updatedUser);
       setMessage("Perfil atualizado com sucesso.");
-      setSelectedFile(null);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Erro ao atualizar perfil.",
@@ -111,6 +111,8 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
     }
   };
 
+  const previewUrl = avatarUrl.trim();
+
   return (
     <Modal
       isOpen={isOpen}
@@ -144,6 +146,9 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
                 src={previewUrl}
                 alt={user.name}
                 className="w-16 h-16 rounded-full object-cover border"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
               />
             ) : (
               <div className="w-16 h-16 rounded-full bg-primary-500 text-white flex items-center justify-center font-bold">
@@ -153,13 +158,14 @@ export const AccountSettingsModal: React.FC<AccountSettingsModalProps> = ({
 
             <div className="flex-1">
               <label className="block text-xs mb-1 text-slate-500">
-                Foto de perfil
+                Link da foto de perfil
               </label>
               <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                className="block w-full text-sm"
+                type="url"
+                value={avatarUrl}
+                onChange={(e) => setAvatarUrl(e.target.value)}
+                placeholder="https://exemplo.com/foto.jpg"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
               />
             </div>
           </div>
