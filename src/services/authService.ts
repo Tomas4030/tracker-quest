@@ -261,6 +261,33 @@ class AuthService {
     const user = this.users.find((u) => u.id === id);
     return user ? this._touchTeamMetadata(user) : undefined;
   }
+
+  async refreshCurrentUser(): Promise<User | null> {
+    if (!supabase) return null;
+
+    const {
+      data: { user: authUser },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError) throw new Error(authError.message);
+    if (!authUser) return null;
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", authUser.id)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+
+    const mapped = this._touchTeamMetadata(this._mapDbUser(data));
+    this._persistCurrentUser(mapped);
+    this._upsertUserInCache(mapped);
+
+    return mapped;
+  }
 }
 
 export const authService = new AuthService();

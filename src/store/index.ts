@@ -8,6 +8,7 @@ interface AppStore {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   setUser: (user: User | null) => void;
+  refreshUser: () => Promise<void>;
 
   activities: Activity[];
   setActivities: (activities: Activity[]) => void;
@@ -38,6 +39,11 @@ export const useAppStore = create<AppStore>((set) => ({
   },
 
   setUser: (user) => set({ user }),
+
+  refreshUser: async () => {
+    const user = await authService.refreshCurrentUser();
+    set({ user });
+  },
 
   activities: [],
   setActivities: (activities) => set({ activities }),
