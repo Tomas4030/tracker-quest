@@ -31,3 +31,7 @@ out/
 *.njsproj
 *.sln
 *.sw?
+
+# Claude / OpenClaude 
+.claude/
+settings.local.json
