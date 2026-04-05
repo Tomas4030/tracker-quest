@@ -1,24 +1,15 @@
-import type { Project, Team, User, UserRole } from "@/types";
+import type { Project, User, UserRole } from "@/types";
 import { supabase } from "./supabase";
 import { teamService } from "./teamService";
 import { projectService } from "./projectService";
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 class AuthService {
   private users: User[] = [];
-
-  private _isMissingColumnError(message: string, column: string): boolean {
-    const normalized = message.toLowerCase();
-    return (
-      normalized.includes("could not find") &&
-      normalized.includes(`'${column.toLowerCase()}'`) &&
-      normalized.includes("column")
-    );
-  }
 
   private _persistCurrentUser(user: User | null) {
     if (typeof window === "undefined") return;
@@ -61,10 +52,9 @@ class AuthService {
 
     if (index === -1) {
       this.users = [...this.users, user];
-      return;
+    } else {
+      this.users[index] = user;
     }
-
-    this.users[index] = user;
   }
 
   private _mapDbUser(profile: {
@@ -98,10 +88,7 @@ class AuthService {
   }
 
   async loadAll(): Promise<User[]> {
-    if (!supabase) {
-      this.users = [];
-      return [];
-    }
+    if (!supabase) return [];
 
     const { data, error } = await supabase
       .from("users")
@@ -119,9 +106,7 @@ class AuthService {
 
   async login(email: string, password: string): Promise<User> {
     if (!supabase) {
-      throw new Error(
-        "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      );
+      throw new Error("Supabase não configurado.");
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -178,17 +163,11 @@ class AuthService {
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
 
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("estagio_current_user");
-    }
+    localStorage.removeItem("estagio_current_user");
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
-    if (!supabase) {
-      throw new Error(
-        "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      );
-    }
+    if (!supabase) throw new Error("Supabase não configurado.");
 
     const payload = {
       name: updates.name,
@@ -225,27 +204,21 @@ class AuthService {
   }
 
   async uploadAvatar(file: File, userId: string): Promise<string> {
-    if (!supabase) {
-      throw new Error("Supabase não configurado.");
-    }
+    if (!supabase) throw new Error("Supabase não configurado.");
 
     const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const filePath = `${userId}/avatar-${Date.now()}.${extension}`;
 
     const { error: uploadError } = await supabase.storage
       .from("avatars")
-      .upload(filePath, file, {
-        upsert: true,
-      });
+      .upload(filePath, file, { upsert: true });
 
-    if (uploadError) {
-      throw new Error(uploadError.message);
-    }
+    if (uploadError) throw new Error(uploadError.message);
 
     const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
     if (!data?.publicUrl) {
-      throw new Error("Não foi possível obter a URL pública do avatar.");
+      throw new Error("Erro ao obter URL da imagem.");
     }
 
     return data.publicUrl;
@@ -257,9 +230,7 @@ class AuthService {
   }
 
   async sendPasswordResetEmail(email: string): Promise<void> {
-    if (!supabase) {
-      throw new Error("Supabase não configurado.");
-    }
+    if (!supabase) throw new Error("Supabase não configurado.");
 
     const redirectTo =
       typeof window !== "undefined"
@@ -274,9 +245,7 @@ class AuthService {
   }
 
   async updateMyPassword(newPassword: string): Promise<void> {
-    if (!supabase) {
-      throw new Error("Supabase não configurado.");
-    }
+    if (!supabase) throw new Error("Supabase não configurado.");
 
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
@@ -311,6 +280,7 @@ class AuthService {
 
   getById(id: string): User | undefined {
     if (!this._isUuid(id)) return undefined;
+
     const user = this.users.find((u) => u.id === id);
     return user ? this._touchTeamMetadata(user) : undefined;
   }
