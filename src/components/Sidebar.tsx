@@ -22,7 +22,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const pathname = usePathname();
   const [showMobileButton, setShowMobileButton] = useState(true);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   useEffect(() => {
     let hideTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -117,11 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* User */}
         <div className="p-4">
-          <button
-            type="button"
-            onClick={() => setIsAccountModalOpen(true)}
-            className="w-full text-left "
-          >
+          <button type="button" className="w-full text-left ">
             <div className="flex items-center gap-3">
               {user.avatarUrl ? (
                 <img
