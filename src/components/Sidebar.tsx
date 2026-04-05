@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { LogOut, Menu, X } from "lucide-react";
 import type { User } from "@/types";
 import { getInitials } from "@/utils/helpers";
+import { AccountSettingsModal } from "./AccountSettingsModal";
 
 interface SidebarProps {
   user: User | null;
@@ -22,6 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 }) => {
   const pathname = usePathname();
   const [showMobileButton, setShowMobileButton] = useState(true);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   useEffect(() => {
     let hideTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -77,7 +79,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <>
-      {/* Mobile Menu Button */}
       <button
         onClick={onToggle}
         className={`fixed left-4 top-4 z-40 rounded-lg border border-slate-200 bg-white p-2 transition-all duration-300 hover:bg-slate-50 md:hidden ${
@@ -89,7 +90,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
 
-      {/* Overlay */}
       {isOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/20 md:hidden"
@@ -97,13 +97,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
       )}
 
-      {/* Sidebar */}
       <nav
         className={`fixed left-0 top-0 bottom-0 w-60 bg-navy text-white flex flex-col z-40 transform transition-transform md:translate-x-0 ${
           isOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Logo */}
         <div className="px-5 py-5 border-b border-white/10 flex items-center gap-3">
           <div className="w-9 h-9 bg-primary-500 rounded-lg flex items-center justify-center text-sm font-bold">
             📋
@@ -114,9 +112,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* User */}
         <div className="p-4">
-          <button type="button" className="w-full text-left ">
+          <button
+            type="button"
+            onClick={() => setIsAccountModalOpen(true)}
+            className="w-full text-left rounded-xl border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition"
+          >
             <div className="flex items-center gap-3">
               {user.avatarUrl ? (
                 <img
@@ -140,7 +141,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Navigation */}
         <div className="flex-1 px-3 py-4">
           {navItems.map((item) => {
             const isActive = pathname === item.path;
@@ -162,7 +162,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </div>
 
-        {/* Logout */}
         <div className="px-3 py-4 border-t border-white/10">
           <button
             onClick={onLogout}
@@ -174,7 +173,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </nav>
 
-      {/* Main margin on desktop */}
+      <AccountSettingsModal
+        isOpen={isAccountModalOpen}
+        onClose={() => setIsAccountModalOpen(false)}
+        user={user}
+        onUserUpdated={() => setIsAccountModalOpen(false)}
+      />
+
       <div className="hidden md:block w-60 flex-shrink-0" />
     </>
   );
