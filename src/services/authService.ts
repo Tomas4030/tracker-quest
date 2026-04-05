@@ -208,17 +208,20 @@ class AuthService {
 
     const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const filePath = `${userId}/avatar-${Date.now()}.${extension}`;
+    const bucketName = "avatars";
 
     const { error: uploadError } = await supabase.storage
-      .from("avatars")
+      .from(bucketName)
       .upload(filePath, file, { upsert: true });
 
-    if (uploadError) throw new Error(uploadError.message);
+    if (uploadError) {
+      throw new Error(`Erro no upload do avatar: ${uploadError.message}`);
+    }
 
-    const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+    const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
 
     if (!data?.publicUrl) {
-      throw new Error("Erro ao obter URL da imagem.");
+      throw new Error("Erro ao obter URL pública da imagem.");
     }
 
     return data.publicUrl;

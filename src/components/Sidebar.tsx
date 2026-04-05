@@ -7,6 +7,7 @@ import { LogOut, Menu, X } from "lucide-react";
 import type { User } from "@/types";
 import { getInitials } from "@/utils/helpers";
 import { AccountSettingsModal } from "./AccountSettingsModal";
+import { useAppStore } from "@/store";
 
 interface SidebarProps {
   user: User | null;
@@ -24,6 +25,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const pathname = usePathname();
   const [showMobileButton, setShowMobileButton] = useState(true);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+
+  const setUser = useAppStore((state) => state.setUser);
 
   useEffect(() => {
     let hideTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -177,7 +180,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         isOpen={isAccountModalOpen}
         onClose={() => setIsAccountModalOpen(false)}
         user={user}
-        onUserUpdated={() => setIsAccountModalOpen(false)}
+        onUserUpdated={(updatedUser) => {
+          setUser(updatedUser);
+          setIsAccountModalOpen(false);
+        }}
       />
 
       <div className="hidden md:block w-60 flex-shrink-0" />
