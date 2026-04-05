@@ -9,8 +9,7 @@
     "start": "next start -p 3001",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "create:admin": "node scripts/create-admin.mjs",
-    "seed:programming": "node scripts/seed-programming-data.mjs"
+    "clearcache": "powershell -NoProfile -Command \"$conn = Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { Stop-Process -Id $conn.OwningProcess -Force; Write-Output ('Stopped PID ' + $conn.OwningProcess) } else { Write-Output 'No process listening on 3001' }\" && powershell -NoProfile -Command \"Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue\" && npm run dev"
   },
   "dependencies": {
     "next": "^14.2.30",
