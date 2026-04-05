@@ -3,26 +3,21 @@ import type { User, Activity } from "@/types";
 import { authService, activityService } from "@/services";
 
 interface AppStore {
-  // Auth
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   setUser: (user: User | null) => void;
 
-  // Activities
   activities: Activity[];
   setActivities: (activities: Activity[]) => void;
-  createActivity: (
-    activity: Omit<Activity, "id" | "createdAt" | "updatedAt">,
-  ) => Promise<void>;
+  createActivity: (activity: Omit<Activity, "id">) => Promise<void>;
   updateActivity: (id: string, updates: Partial<Activity>) => Promise<void>;
   deleteActivity: (id: string) => Promise<void>;
   loadActivities: (userId?: string) => Promise<void>;
 }
 
 export const useAppStore = create<AppStore>((set) => ({
-  // Auth
   user: authService.getCurrentUser() || null,
   isLoading: false,
 
@@ -44,13 +39,14 @@ export const useAppStore = create<AppStore>((set) => ({
 
   setUser: (user) => set({ user }),
 
-  // Activities
   activities: [],
   setActivities: (activities) => set({ activities }),
 
   createActivity: async (activity) => {
     const newActivity = await activityService.create(activity);
-    set((state) => ({ activities: [...state.activities, newActivity] }));
+    set((state) => ({
+      activities: [...state.activities, newActivity],
+    }));
   },
 
   updateActivity: async (id, updates) => {
@@ -71,6 +67,7 @@ export const useAppStore = create<AppStore>((set) => ({
     const activities = userId
       ? await activityService.getByUserId(userId)
       : await activityService.getAll();
+
     set({ activities });
   },
 }));

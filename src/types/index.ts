@@ -41,6 +41,7 @@ export interface User {
   projectIds?: string[];
   temporaryPassword?: string;
   groupCode?: string;
+  avatarUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 }

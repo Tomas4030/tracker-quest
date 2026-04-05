@@ -6,12 +6,14 @@ import { usePathname } from "next/navigation";
 import { LogOut, Menu, X } from "lucide-react";
 import type { User } from "@/types";
 import { getInitials } from "@/utils/helpers";
+import { AccountSettingsModal } from "./AccountSettingsModal";
 
 interface SidebarProps {
   user: User | null;
   onLogout: () => void;
   isOpen: boolean;
   onToggle: () => void;
+  onUserUpdated?: (user: User) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -19,9 +21,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   isOpen,
   onToggle,
+  onUserUpdated,
 }) => {
   const pathname = usePathname();
   const [showMobileButton, setShowMobileButton] = useState(true);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
 
   useEffect(() => {
     let hideTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -29,19 +33,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const setActive = () => {
       setShowMobileButton(true);
-
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-      }
+      if (hideTimeout) clearTimeout(hideTimeout);
 
       hideTimeout = setTimeout(() => {
-        if (!isOpen) {
-          setShowMobileButton(false);
-        }
+        if (!isOpen) setShowMobileButton(false);
       }, hideDelay);
     };
 
-    const events: Array<keyof WindowEventMap> = [
+    const events = [
       "scroll",
       "mousemove",
       "touchstart",
@@ -50,16 +49,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     ];
 
     setActive();
-
     events.forEach((eventName) => {
       window.addEventListener(eventName, setActive, { passive: true });
     });
 
     return () => {
-      if (hideTimeout) {
-        clearTimeout(hideTimeout);
-      }
-
+      if (hideTimeout) clearTimeout(hideTimeout);
       events.forEach((eventName) => {
         window.removeEventListener(eventName, setActive);
       });
@@ -70,8 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const navItems = [
     { path: "/dashboard", label: "Dashboard", icon: "⊞" },
-    { path: "/calendar", label: "Calendário", icon: "🗓" },
-
+    { path: "/calendar", label: "Calendário", icon: "📅" },
     { path: "/register", label: "Registar horas", icon: "⏱" },
     ...(user.role === "admin"
       ? [
@@ -125,16 +119,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* User */}
-        <div className="px-5 py-4 border-b border-white/10 flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary-500 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
-            {getInitials(user.name)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium truncate">{user.name}</div>
-            <div className="text-xs text-white/50">
-              {user.role === "admin" ? "Administrador" : "Estagiário"}
+        <div className="p-4">
+          <button
+            type="button"
+            onClick={() => setIsAccountModalOpen(true)}
+            className="w-full text-left "
+          >
+            <div className="flex items-center gap-3">
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={user.name}
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center font-semibold">
+                  {getInitials(user.name)}
+                </div>
+              )}
+
+              <div className="min-w-0">
+                <p className="font-medium truncate">{user.name}</p>
+                <p className="text-sm text-white/60 truncate uppercase">{user.role}</p>
+              </div>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Navigation */}

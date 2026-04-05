@@ -3,7 +3,7 @@ import { supabase } from "./supabase";
 import { teamService } from "./teamService";
 import { projectService } from "./projectService";
 
-const ADMIN_EMAIL = "admin@estagio.pt";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -22,16 +22,19 @@ class AuthService {
 
   private _persistCurrentUser(user: User | null) {
     if (typeof window === "undefined") return;
+
     if (!user) {
       localStorage.removeItem("estagio_current_user");
       return;
     }
+
     localStorage.setItem("estagio_current_user", JSON.stringify(user));
   }
 
   private _touchTeamMetadata(user: User): User {
     const team = user.teamId ? teamService.getById(user.teamId) : undefined;
     const enrichedProjects = this._getProjectNames(user.projectIds || []);
+
     return {
       ...user,
       teamName: team?.name || user.teamName,
@@ -55,10 +58,12 @@ class AuthService {
 
   private _upsertUserInCache(user: User): void {
     const index = this.users.findIndex((item) => item.id === user.id);
+
     if (index === -1) {
       this.users = [...this.users, user];
       return;
     }
+
     this.users[index] = user;
   }
 
@@ -72,6 +77,7 @@ class AuthService {
     company?: string | null;
     group_code?: string | null;
     project_ids?: string[] | null;
+    avatar_url?: string | null;
     created_at?: string;
     updated_at?: string;
   }): User {
@@ -85,6 +91,7 @@ class AuthService {
       company: profile.company || undefined,
       groupCode: profile.group_code || undefined,
       projectIds: profile.project_ids || [],
+      avatarUrl: profile.avatar_url || undefined,
       createdAt: profile.created_at,
       updatedAt: profile.updated_at,
     };
@@ -106,6 +113,7 @@ class AuthService {
     this.users = (data || []).map((item) =>
       this._touchTeamMetadata(this._mapDbUser(item)),
     );
+
     return this.users;
   }
 
@@ -120,6 +128,7 @@ class AuthService {
       email,
       password,
     });
+
     if (error) throw new Error(error.message);
     if (!data.user) throw new Error("Login failed");
 
@@ -132,6 +141,7 @@ class AuthService {
     if (profileError) throw new Error(profileError.message);
 
     let finalProfile = profile;
+
     if (!finalProfile) {
       const fallbackRole: UserRole =
         email.toLowerCase() === ADMIN_EMAIL ? "admin" : "estagiario";
@@ -158,124 +168,19 @@ class AuthService {
     const mapped = this._touchTeamMetadata(this._mapDbUser(finalProfile));
     this._upsertUserInCache(mapped);
     this._persistCurrentUser(mapped);
-    return mapped;
-  }
 
-  async register(
-    name: string,
-    email: string,
-    password: string,
-    role: UserRole,
-  ): Promise<User> {
-    if (!supabase) {
-      throw new Error(
-        "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      );
-    }
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { name },
-      },
-    });
-    if (error) throw new Error(error.message);
-    if (!data.user) throw new Error("Registration failed");
-
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .upsert(
-        {
-          id: data.user.id,
-          name,
-          email,
-          role,
-          active: true,
-        },
-        { onConflict: "id" },
-      )
-      .select("*")
-      .single();
-
-    if (profileError) throw new Error(profileError.message);
-    const mapped = this._touchTeamMetadata(this._mapDbUser(profile));
-    this._upsertUserInCache(mapped);
-    this._persistCurrentUser(mapped);
-    return mapped;
-  }
-
-  async createAccount(input: {
-    name: string;
-    email: string;
-    password: string;
-    role: UserRole;
-    active?: boolean;
-    teamId?: string;
-    projectIds?: string[];
-    company?: string;
-    groupCode?: string;
-  }): Promise<User> {
-    const {
-      name,
-      email,
-      password,
-      role,
-      active = true,
-      teamId,
-      projectIds,
-      company,
-      groupCode,
-    } = input;
-
-    if (!supabase) {
-      throw new Error(
-        "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
-      );
-    }
-    const response = await fetch("/api/admin/users", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        email,
-        password,
-        role,
-        active,
-        teamId,
-        projectIds,
-        company,
-        groupCode,
-      }),
-    });
-
-    const payload = (await response.json()) as
-      | { error?: string }
-      | Record<string, unknown>;
-
-    if (!response.ok) {
-      const message =
-        typeof payload.error === "string"
-          ? payload.error
-          : "Falha ao criar a conta.";
-      throw new Error(message);
-    }
-
-    const mapped = this._touchTeamMetadata(
-      this._mapDbUser(payload as Parameters<typeof this._mapDbUser>[0]),
-    );
-    this._upsertUserInCache(mapped);
     return mapped;
   }
 
   async logout(): Promise<void> {
     if (!supabase) return;
+
     const { error } = await supabase.auth.signOut();
     if (error) throw new Error(error.message);
-    if (typeof window === "undefined") return;
-    localStorage.removeItem("estagio_current_user");
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("estagio_current_user");
+    }
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User> {
@@ -284,7 +189,6 @@ class AuthService {
         "Supabase não configurado. Define NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.",
       );
     }
-    const db = supabase;
 
     const payload = {
       name: updates.name,
@@ -299,34 +203,18 @@ class AuthService {
       project_ids: updates.projectIds,
       company: updates.company,
       group_code: updates.groupCode,
+      avatar_url: updates.avatarUrl,
     };
 
-    const attempt = async (withoutProjectIds: boolean) => {
-      const nextPayload = withoutProjectIds
-        ? (() => {
-            const { project_ids, ...rest } = payload;
-            void project_ids;
-            return rest;
-          })()
-        : payload;
-
-      return db
-        .from("users")
-        .update(nextPayload)
-        .eq("id", id)
-        .select("*")
-        .single();
-    };
-
-    let { data, error } = await attempt(false);
-
-    if (error && this._isMissingColumnError(error.message, "project_ids")) {
-      const retry = await attempt(true);
-      data = retry.data;
-      error = retry.error;
-    }
+    const { data, error } = await supabase
+      .from("users")
+      .update(payload)
+      .eq("id", id)
+      .select("*")
+      .single();
 
     if (error) throw new Error(error.message);
+
     const mapped = this._touchTeamMetadata(this._mapDbUser(data));
     this._upsertUserInCache(mapped);
 
@@ -336,46 +224,81 @@ class AuthService {
     return mapped;
   }
 
-  async toggleUserActive(id: string, active: boolean): Promise<User> {
-    return this.updateUser(id, { active });
+  async uploadAvatar(file: File, userId: string): Promise<string> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
+
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const filePath = `${userId}/avatar-${Date.now()}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, {
+        upsert: true,
+      });
+
+    if (uploadError) {
+      throw new Error(uploadError.message);
+    }
+
+    const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      throw new Error("Não foi possível obter a URL pública do avatar.");
+    }
+
+    return data.publicUrl;
   }
 
-  async assignUserTeam(
-    id: string,
-    team: Pick<Team, "id" | "name" | "company" | "groupCode"> | null,
-  ): Promise<User> {
-    return this.updateUser(id, {
-      teamId: team?.id,
-      teamName: team?.name,
-      company: team?.company,
-      groupCode: team?.groupCode,
+  async updateAvatar(userId: string, file: File): Promise<User> {
+    const avatarUrl = await this.uploadAvatar(file, userId);
+    return this.updateUser(userId, { avatarUrl });
+  }
+
+  async sendPasswordResetEmail(email: string): Promise<void> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
+
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/auth/update-password`
+        : undefined;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
     });
+
+    if (error) throw new Error(error.message);
   }
 
-  async assignUserProjects(id: string, projectIds: string[]): Promise<User> {
-    return this.updateUser(id, { projectIds });
-  }
+  async updateMyPassword(newPassword: string): Promise<void> {
+    if (!supabase) {
+      throw new Error("Supabase não configurado.");
+    }
 
-  async resetPassword(id: string, password: string): Promise<User> {
-    void id;
-    void password;
-    throw new Error(
-      "A alteração de palavra-passe por admins requer chave service_role. Usa o script scripts/create-admin.mjs ou o painel Auth do Supabase.",
-    );
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) throw new Error(error.message);
   }
 
   getCurrentUser(): User | null {
     if (typeof window === "undefined") return null;
+
     const stored = localStorage.getItem("estagio_current_user");
-    if (stored) {
-      const parsed = JSON.parse(stored) as User;
-      if (!this._isUuid(parsed.id)) {
-        localStorage.removeItem("estagio_current_user");
-        return null;
-      }
-      return parsed;
+    if (!stored) return null;
+
+    const parsed = JSON.parse(stored) as User;
+
+    if (!this._isUuid(parsed.id)) {
+      localStorage.removeItem("estagio_current_user");
+      return null;
     }
-    return null;
+
+    return parsed;
   }
 
   getAll(): User[] {
