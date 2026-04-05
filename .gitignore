@@ -35,3 +35,5 @@ out/
 # Claude / OpenClaude 
 .claude/
 settings.local.json
+OpenClaude
+set
