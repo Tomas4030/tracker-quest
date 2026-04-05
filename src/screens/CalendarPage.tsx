@@ -354,7 +354,7 @@ export const CalendarPage: React.FC = () => {
               onChange={(event) => setFilterDate(event.target.value)}
             />
 
-            <div className="flex items-end">
+            <div className="flex items-center">
               <Button
                 variant="secondary"
                 className="w-full"

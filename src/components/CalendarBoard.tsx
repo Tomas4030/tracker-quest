@@ -71,6 +71,7 @@ function getCalendarLabel(view: CalendarViewMode, referenceDate: Date): string {
       day: "numeric",
       month: "short",
     });
+
     const lastLabel = last.toLocaleDateString("pt-PT", {
       day: "numeric",
       month: "short",
@@ -94,7 +95,7 @@ function isToday(dateKey: string): boolean {
 }
 
 function getCalendarActivityLabel(activity: Activity): string {
-  return `${formatTime(formatTime(activity.startTime))} - ${formatTime(formatTime(activity.endTime))}`;
+  return `${formatTime(activity.startTime)} - ${formatTime(activity.endTime)}`;
 }
 
 function getActivitiesForDate(
@@ -119,6 +120,17 @@ function getActivitiesForMonth(
   });
 }
 
+function getMonthLeadingEmptyCells(referenceDate: Date): number {
+  const firstDayOfMonth = new Date(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    1,
+  );
+
+  const jsDay = firstDayOfMonth.getDay(); // 0=Dom, 1=Seg, 2=Ter...
+  return jsDay === 0 ? 6 : jsDay - 1; // Seg=0, Ter=1, ..., Dom=6
+}
+
 function getWeekDates(referenceDate: Date): Date[] {
   const base = new Date(
     referenceDate.getFullYear(),
@@ -140,9 +152,7 @@ function getWeekDates(referenceDate: Date): Date[] {
 }
 
 /**
- * Aqui está a correção principal para o modo mês:
- * gera APENAS os dias do mês atual.
- * Nada de dias do mês anterior/seguinte.
+ * Gera apenas os dias do mês atual.
  */
 function getMonthDates(referenceDate: Date): Date[] {
   const year = referenceDate.getFullYear();
@@ -187,6 +197,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
 }) => {
   const dates = getCalendarDates(view, referenceDate);
   const calendarLabel = getCalendarLabel(view, referenceDate);
+  const monthLeadingEmptyCells = getMonthLeadingEmptyCells(referenceDate);
 
   const renderActivityChip = (activity: Activity) => {
     const user = users.find((item) => item.id === activity.userId);
@@ -215,6 +226,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
               {user?.name || "Sem utilizador"}
             </div>
           </div>
+
           <div className="whitespace-nowrap text-[11px] font-mono text-slate-500">
             {getCalendarActivityLabel(activity)}
           </div>
@@ -248,7 +260,7 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
           <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
             Calendário
           </div>
-          <h2 className="mt-1 text-xl font-semibold text-navy capitalize">
+          <h2 className="mt-1 text-xl font-semibold capitalize text-navy">
             {calendarLabel}
           </h2>
         </div>
@@ -390,9 +402,8 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                 }`}
               >
                 <div className="flex h-full flex-col">
-                  {/* topo */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="text-base font-semibold text-slate-900 capitalize">
+                    <div className="text-base font-semibold capitalize text-slate-900">
                       {date.toLocaleDateString("pt-PT", { weekday: "long" })}
                     </div>
 
@@ -401,7 +412,6 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                     </div>
                   </div>
 
-                  {/* atividades */}
                   <div className="mt-3 flex-1 space-y-2">
                     {dayActivities.slice(0, 3).map((activity) => (
                       <div
@@ -434,7 +444,6 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                     )}
                   </div>
 
-                  {/* footer */}
                   <div className="mt-3 text-xs font-mono text-slate-500">
                     {formatHours(dayHours)}
                   </div>
@@ -456,6 +465,14 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
+            {Array.from({ length: monthLeadingEmptyCells }).map((_, index) => (
+              <div
+                key={`empty-${index}`}
+                className="hidden min-h-[160px] rounded-2xl border border-transparent bg-transparent lg:block"
+                aria-hidden="true"
+              />
+            ))}
+
             {dates.map((date) => {
               const dateKey = formatDateKey(date);
               const dayActivities = activities
@@ -464,7 +481,11 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
 
               const dayHours = dayActivities.reduce(
                 (total, activity) =>
-                  total + calculateHours(activity.startTime, activity.endTime),
+                  total +
+                  calculateHours(
+                    formatTime(activity.startTime),
+                    formatTime(activity.endTime),
+                  ),
                 0,
               );
 
@@ -478,7 +499,6 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                   }`}
                 >
                   <div className="flex h-full flex-col">
-                    {/* topo fixo */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="text-base font-semibold text-slate-900">
                         {date.getDate()}
@@ -489,7 +509,6 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                       </div>
                     </div>
 
-                    {/* cards */}
                     <div className="mt-3 flex-1 space-y-2">
                       {dayActivities.slice(0, 2).map((activity) => (
                         <div
@@ -539,7 +558,10 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                 getActivitiesForMonth(activities, referenceDate).reduce(
                   (total, activity) =>
                     total +
-                    calculateHours(activity.startTime, activity.endTime),
+                    calculateHours(
+                      formatTime(activity.startTime),
+                      formatTime(activity.endTime),
+                    ),
                   0,
                 ),
               )}
