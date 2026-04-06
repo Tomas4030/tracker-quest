@@ -11,17 +11,40 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const router = useRouter();
   const user = useAppStore((state) => state.user);
+  const refreshUser = useAppStore((state) => state.refreshUser);
   const [isMounted, setIsMounted] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
 
   useEffect(() => {
     setIsMounted(true);
 
-    if (!user) {
+    let isActive = true;
+    const syncSession = async () => {
+      try {
+        await refreshUser();
+      } catch {
+        // On refresh failure we fall back to login.
+      } finally {
+        if (isActive) {
+          setIsCheckingSession(false);
+        }
+      }
+    };
+
+    syncSession();
+
+    return () => {
+      isActive = false;
+    };
+  }, [refreshUser]);
+
+  useEffect(() => {
+    if (!isCheckingSession && !user) {
       router.replace("/login");
     }
-  }, [router, user]);
+  }, [isCheckingSession, router, user]);
 
-  if (!isMounted) {
+  if (!isMounted || isCheckingSession) {
     return <div className="min-h-screen bg-slate-50" />;
   }
 

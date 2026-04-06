@@ -32,9 +32,8 @@ import {
   formatDate,
   formatHours,
   getTodayString,
-  formatTime
+  formatTime,
 } from "@/utils/helpers";
-
 
 function shiftDate(
   referenceDate: Date,
@@ -289,8 +288,8 @@ export const CalendarPage: React.FC = () => {
     <>
       <Topbar title="Calendário de atividades" date={formatDate(new Date())} />
 
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6">
-        <Card>
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-4 sm:p-6 ">
+        <Card className="">
           <CardHeader className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <CardTitle>Controlos do calendário</CardTitle>
 
@@ -354,10 +353,9 @@ export const CalendarPage: React.FC = () => {
               onChange={(event) => setFilterDate(event.target.value)}
             />
 
-            <div className="flex items-center">
+            <div className="flex items-center justify-end">
               <Button
                 variant="secondary"
-                className="w-full"
                 onClick={() => {
                   setFilterUserId("");
                   setFilterProjectId("");

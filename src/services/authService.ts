@@ -280,9 +280,32 @@ class AuthService {
       .maybeSingle();
 
     if (error) throw new Error(error.message);
-    if (!data) return null;
 
-    const mapped = this._touchTeamMetadata(this._mapDbUser(data));
+    let profile = data;
+    if (!profile) {
+      const fallbackRole: UserRole =
+        authUser.email?.toLowerCase() === ADMIN_EMAIL ? "admin" : "estagiario";
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("users")
+        .insert({
+          id: authUser.id,
+          name:
+            authUser.user_metadata?.name ||
+            authUser.email?.split("@")[0] ||
+            "Utilizador",
+          email: authUser.email || "",
+          role: fallbackRole,
+          active: true,
+        })
+        .select("*")
+        .single();
+
+      if (insertError) throw new Error(insertError.message);
+      profile = inserted;
+    }
+
+    const mapped = this._touchTeamMetadata(this._mapDbUser(profile));
     this._persistCurrentUser(mapped);
     this._upsertUserInCache(mapped);
 

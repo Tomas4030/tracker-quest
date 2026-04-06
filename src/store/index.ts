@@ -51,8 +51,13 @@ export const useAppStore = create<AppStore>((set) => ({
   setUser: (user) => set({ user }),
 
   refreshUser: async () => {
-    const user = await authService.refreshCurrentUser();
-    set({ user });
+    try {
+      const user = await authService.refreshCurrentUser();
+      set({ user });
+    } catch (error) {
+      set({ user: null, projects: [], activities: [] });
+      throw error;
+    }
   },
 
   activities: [],
