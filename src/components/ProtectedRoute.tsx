@@ -8,6 +8,10 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+const SESSION_CHECK_TTL_MS = 2 * 60 * 1000;
+let lastSessionCheckAt = 0;
+let inFlightSessionCheck: Promise<void> | null = null;
+
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const router = useRouter();
   const user = useAppStore((state) => state.user);
@@ -20,8 +24,21 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     let isActive = true;
     const syncSession = async () => {
+      const now = Date.now();
+      if (now - lastSessionCheckAt < SESSION_CHECK_TTL_MS) {
+        if (isActive) setIsCheckingSession(false);
+        return;
+      }
+
       try {
-        await refreshUser();
+        if (!inFlightSessionCheck) {
+          inFlightSessionCheck = refreshUser().finally(() => {
+            lastSessionCheckAt = Date.now();
+            inFlightSessionCheck = null;
+          });
+        }
+
+        await inFlightSessionCheck;
       } catch {
         // On refresh failure we fall back to login.
       } finally {
