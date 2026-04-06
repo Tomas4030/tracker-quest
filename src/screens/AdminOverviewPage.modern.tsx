@@ -29,7 +29,12 @@ import {
 } from "@/services";
 import { useAppStore } from "@/store";
 import type { Activity, Project, Team, User, UserRole } from "@/types";
-import { calculateHours, formatHours, formatTime } from "@/utils/helpers";
+import {
+  calculateHours,
+  formatHours,
+  formatTime,
+  getWeekDates,
+} from "@/utils/helpers";
 
 type AccountWizardStep = 1 | 2;
 
@@ -149,6 +154,15 @@ export const AdminOverviewPage: React.FC = () => {
 
   const filteredUsers = users;
   const filteredActivities = activities;
+  const weekDates = useMemo(() => getWeekDates(), []);
+
+  const weeklyTeamActivities = useMemo(
+    () =>
+      filteredActivities.filter((activity) =>
+        weekDates.includes(activity.date),
+      ),
+    [filteredActivities, weekDates],
+  );
 
   const totalHours = filteredActivities.reduce(
     (sum, activity) =>
@@ -175,21 +189,25 @@ export const AdminOverviewPage: React.FC = () => {
 
   const ACTIVITIES_PER_PAGE = 6;
   const totalTeamActivitiesPages = Math.ceil(
-    filteredActivities.length / ACTIVITIES_PER_PAGE,
+    weeklyTeamActivities.length / ACTIVITIES_PER_PAGE,
   );
-  const paginatedTeamActivities = filteredActivities.slice(
+  const paginatedTeamActivities = weeklyTeamActivities.slice(
     (recentActivitiesTeamPage - 1) * ACTIVITIES_PER_PAGE,
     recentActivitiesTeamPage * ACTIVITIES_PER_PAGE,
   );
 
   const allTeamActivityPages = useMemo(() => {
     return Array.from({ length: totalTeamActivitiesPages }, (_, index) =>
-      filteredActivities.slice(
+      weeklyTeamActivities.slice(
         index * ACTIVITIES_PER_PAGE,
         (index + 1) * ACTIVITIES_PER_PAGE,
       ),
     );
-  }, [filteredActivities, totalTeamActivitiesPages]);
+  }, [totalTeamActivitiesPages, weeklyTeamActivities]);
+
+  useEffect(() => {
+    setRecentActivitiesTeamPage(1);
+  }, [weeklyTeamActivities.length]);
 
   const TEAM_CARDS_PER_PAGE = 6;
   const totalTeamsPages = Math.ceil(teams.length / TEAM_CARDS_PER_PAGE);
@@ -1326,4 +1344,3 @@ export const AdminOverviewPage: React.FC = () => {
 };
 
 export default AdminOverviewPage;
-
