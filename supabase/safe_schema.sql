@@ -92,12 +92,23 @@ begin
     alter table public.users add constraint users_email_unique unique (email);
   end if;
 
-  if not exists (
+  -- Allow custom roles (e.g. coordenador, gestor, etc.) while enforcing non-empty values.
+  if exists (
     select 1 from pg_constraint
     where conname = 'users_role_check'
       and conrelid = 'public.users'::regclass
   ) then
-    alter table public.users add constraint users_role_check check (role in ('admin', 'estagiario'));
+    alter table public.users drop constraint users_role_check;
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'users_role_not_empty_check'
+      and conrelid = 'public.users'::regclass
+  ) then
+    alter table public.users
+      add constraint users_role_not_empty_check
+      check (length(trim(role)) > 0);
   end if;
 
   if not exists (

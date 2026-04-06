@@ -1,7 +1,7 @@
 /**
  * User Type
  */
-export type UserRole = "admin" | "estagiario";
+export type UserRole = string;
 
 export type AccountStatus = "active" | "inactive";
 

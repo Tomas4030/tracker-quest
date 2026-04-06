@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardHeader,
@@ -17,18 +17,20 @@ import {
   Pagination,
 } from "@/components";
 import { useAppStore } from "@/store";
+import { projectService } from "@/services";
 import {
   getTodayString,
   formatDate,
   formatHours,
   calculateHours,
 } from "@/utils/helpers";
-import type { ActivityStatus } from "@/types";
+import type { ActivityStatus, Project } from "@/types";
 
 type RegisterViewMode = "hoje" | "total";
 
 export const RegisterPage: React.FC = () => {
   const { user, activities, loadActivities, createActivity } = useAppStore();
+  const [projects, setProjects] = useState<Project[]>([]);
   const [viewMode, setViewMode] = useState<RegisterViewMode>("hoje");
   const [recordsPage, setRecordsPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
@@ -36,13 +38,31 @@ export const RegisterPage: React.FC = () => {
   const [formDate, setFormDate] = useState(getTodayString());
   const [formStartTime, setFormStartTime] = useState("09:00");
   const [formEndTime, setFormEndTime] = useState("13:00");
-  const [formTitle, setFormTitle] = useState("");
+  const [formProjectId, setFormProjectId] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formStatus, setFormStatus] = useState<ActivityStatus>("em-curso");
 
   useEffect(() => {
-    if (user) loadActivities(user.id);
-  }, [user]);
+    if (!user) return;
+
+    const loadContext = async () => {
+      await loadActivities(user.id);
+      const loadedProjects = await projectService.loadAll();
+      setProjects(loadedProjects.filter((project) => project.active));
+    };
+
+    loadContext().catch(() => {
+      setProjects([]);
+    });
+  }, [loadActivities, user]);
+
+  const availableProjects = useMemo(() => {
+    if (!user) return [];
+
+    if (user.role === "admin") return projects;
+
+    return projects.filter((project) => user.projectIds?.includes(project.id));
+  }, [projects, user]);
 
   const today = getTodayString();
   const todayActivities = activities.filter((a) => a.date === today);
@@ -72,30 +92,46 @@ export const RegisterPage: React.FC = () => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
-    if (!formTitle.trim()) {
-      setError("Por favor, insere um título para a atividade");
+
+    if (!formProjectId) {
+      setError("Por favor, seleciona um projeto");
       return;
     }
+
     if (!formDate || !formStartTime || !formEndTime) {
       setError("Por favor, preenche todos os campos obrigatórios");
       return;
     }
+
     if (formStartTime >= formEndTime) {
       setError("A hora de fim deve ser posterior à de início");
       return;
     }
+
+    const selectedProject = availableProjects.find(
+      (project) => project.id === formProjectId,
+    );
+
+    if (!selectedProject) {
+      setError("O projeto selecionado não está atribuído ao teu utilizador");
+      return;
+    }
+
     try {
       await createActivity({
         userId: user!.id,
-        title: formTitle,
+        projectId: selectedProject.id,
+        projectName: selectedProject.name,
+        title: selectedProject.name,
         description: formDescription,
         date: formDate,
         startTime: formStartTime,
         endTime: formEndTime,
         status: formStatus,
       });
+
       setSuccess("Atividade registada com sucesso!");
-      setFormTitle("");
+      setFormProjectId("");
       setFormDescription("");
       setFormStartTime("09:00");
       setFormEndTime("13:00");
@@ -156,12 +192,16 @@ export const RegisterPage: React.FC = () => {
                     required
                   />
                 </div>
-                <Input
+                <Select
                   label="Projeto / Tarefa"
-                  type="text"
-                  placeholder="Ex: Desenvolvimento da Aplicação X"
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
+                  value={formProjectId}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                    setFormProjectId(e.target.value)
+                  }
+                  options={availableProjects.map((project) => ({
+                    value: project.id,
+                    label: project.name,
+                  }))}
                   required
                 />
                 <Textarea

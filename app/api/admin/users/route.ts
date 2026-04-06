@@ -5,7 +5,7 @@ type CreateAdminUserBody = {
   name?: string;
   email?: string;
   password?: string;
-  role?: "admin" | "estagiario";
+  role?: string;
   active?: boolean;
   teamId?: string | null;
   projectIds?: string[];

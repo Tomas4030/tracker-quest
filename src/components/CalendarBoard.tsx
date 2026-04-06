@@ -120,17 +120,6 @@ function getActivitiesForMonth(
   });
 }
 
-function getMonthLeadingEmptyCells(referenceDate: Date): number {
-  const firstDayOfMonth = new Date(
-    referenceDate.getFullYear(),
-    referenceDate.getMonth(),
-    1,
-  );
-
-  const jsDay = firstDayOfMonth.getDay(); // 0=Dom, 1=Seg, 2=Ter...
-  return jsDay === 0 ? 6 : jsDay - 1; // Seg=0, Ter=1, ..., Dom=6
-}
-
 function getWeekDates(referenceDate: Date): Date[] {
   const base = new Date(
     referenceDate.getFullYear(),
@@ -151,17 +140,33 @@ function getWeekDates(referenceDate: Date): Date[] {
   });
 }
 
-/**
- * Gera apenas os dias do mês atual.
- */
 function getMonthDates(referenceDate: Date): Date[] {
   const year = referenceDate.getFullYear();
   const month = referenceDate.getMonth();
-  const totalDays = new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = new Date(year, month, 1);
+  const lastDayOfMonth = new Date(year, month + 1, 0);
+
+  const firstJsDay = firstDayOfMonth.getDay(); // 0=Dom, 1=Seg...
+  const startOffset = firstJsDay === 0 ? 6 : firstJsDay - 1;
+
+  const startDate = new Date(year, month, 1 - startOffset);
+
+  const lastJsDay = lastDayOfMonth.getDay(); // 0=Dom, 1=Seg...
+  const endOffset = lastJsDay === 0 ? 0 : 7 - lastJsDay;
+  const totalDays = lastDayOfMonth.getDate() + startOffset + endOffset;
 
   return Array.from({ length: totalDays }, (_, index) => {
-    return new Date(year, month, index + 1);
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    return date;
   });
+}
+
+function isCurrentMonth(date: Date, referenceDate: Date): boolean {
+  return (
+    date.getMonth() === referenceDate.getMonth() &&
+    date.getFullYear() === referenceDate.getFullYear()
+  );
 }
 
 function getCalendarDates(view: CalendarViewMode, referenceDate: Date): Date[] {
@@ -197,7 +202,6 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
 }) => {
   const dates = getCalendarDates(view, referenceDate);
   const calendarLabel = getCalendarLabel(view, referenceDate);
-  const monthLeadingEmptyCells = getMonthLeadingEmptyCells(referenceDate);
 
   const renderActivityChip = (activity: Activity) => {
     const user = users.find((item) => item.id === activity.userId);
@@ -465,16 +469,12 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
-            {Array.from({ length: monthLeadingEmptyCells }).map((_, index) => (
-              <div
-                key={`empty-${index}`}
-                className="hidden min-h-[160px] rounded-2xl border border-transparent bg-transparent lg:block"
-                aria-hidden="true"
-              />
-            ))}
-
             {dates.map((date) => {
               const dateKey = formatDateKey(date);
+              const isOutsideCurrentMonth = !isCurrentMonth(
+                date,
+                referenceDate,
+              );
               const dayActivities = activities
                 .filter((activity) => activity.date === dateKey)
                 .sort((a, b) => a.startTime.localeCompare(b.startTime));
@@ -494,13 +494,21 @@ export const CalendarBoard: React.FC<CalendarBoardProps> = ({
                   key={dateKey}
                   type="button"
                   onClick={() => onSelectDate?.(dateKey)}
-                  className={`min-h-[160px] rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
-                    isToday(dateKey) ? "ring-2 ring-primary-200" : ""
-                  }`}
+                  className={`min-h-[160px] rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${
+                    isOutsideCurrentMonth
+                      ? "border-slate-200 bg-slate-50/70"
+                      : "border-slate-200 bg-white"
+                  } ${isToday(dateKey) ? "ring-2 ring-primary-200" : ""}`}
                 >
                   <div className="flex h-full flex-col">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="text-base font-semibold text-slate-900">
+                      <div
+                        className={`text-base font-semibold ${
+                          isOutsideCurrentMonth
+                            ? "text-slate-500"
+                            : "text-slate-900"
+                        }`}
+                      >
                         {date.getDate()}
                       </div>
 

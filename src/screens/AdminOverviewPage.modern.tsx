@@ -16,10 +16,8 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
-  Input,
   Modal,
   Pagination,
-  Select,
   Topbar,
   StatCard,
 } from "@/components";
@@ -33,16 +31,21 @@ import { useAppStore } from "@/store";
 import type { Activity, Project, Team, User, UserRole } from "@/types";
 import { calculateHours, formatHours, formatTime } from "@/utils/helpers";
 
-const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
-  { value: "estagiario", label: "Estagiário" },
-  { value: "admin", label: "Admin" },
-];
-
 type AccountWizardStep = 1 | 2;
 
 function createTempPassword(name: string): string {
   const firstName = name.split(" ")[0] || "user";
   return `${firstName.toLowerCase()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function getRoleLabel(role: string): string {
+  if (role === "admin") return "Admin";
+  if (role === "estagiario") return "Estagiário";
+  return role
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(" ");
 }
 
 export const AdminOverviewPage: React.FC = () => {
@@ -51,12 +54,6 @@ export const AdminOverviewPage: React.FC = () => {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterTeamId, setFilterTeamId] = useState("");
-  const [filterProjectId, setFilterProjectId] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"" | "active" | "inactive">(
-    "",
-  );
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<AccountWizardStep>(1);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -133,6 +130,11 @@ export const AdminOverviewPage: React.FC = () => {
     [formProjectIds, projects],
   );
 
+  const roleSuggestions = useMemo(() => {
+    const uniqueRoles = Array.from(new Set(users.map((user) => user.role)));
+    return Array.from(new Set(["estagiario", "admin", ...uniqueRoles]));
+  }, [users]);
+
   const filteredProjectOptions = useMemo(() => {
     const term = projectSearchTerm.trim().toLowerCase();
     return projects.filter((project) => {
@@ -145,35 +147,8 @@ export const AdminOverviewPage: React.FC = () => {
     });
   }, [projectSearchTerm, projects]);
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      if (filterStatus === "active" && user.active === false) return false;
-      if (filterStatus === "inactive" && user.active !== false) return false;
-      if (filterTeamId && user.teamId !== filterTeamId) return false;
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        const matchesText =
-          user.name.toLowerCase().includes(term) ||
-          user.email.toLowerCase().includes(term) ||
-          (user.company || "").toLowerCase().includes(term) ||
-          (user.teamName || "").toLowerCase().includes(term);
-        if (!matchesText) return false;
-      }
-      return true;
-    });
-  }, [filterStatus, filterTeamId, searchTerm, users]);
-
-  const filteredActivities = useMemo(() => {
-    return activities.filter((activity) => {
-      if (filterProjectId && activity.projectId !== filterProjectId)
-        return false;
-      if (filterTeamId) {
-        const owner = users.find((user) => user.id === activity.userId);
-        if (owner?.teamId !== filterTeamId) return false;
-      }
-      return true;
-    });
-  }, [activities, filterProjectId, filterTeamId, users]);
+  const filteredUsers = users;
+  const filteredActivities = activities;
 
   const totalHours = filteredActivities.reduce(
     (sum, activity) =>
@@ -184,12 +159,10 @@ export const AdminOverviewPage: React.FC = () => {
       ),
     0,
   );
-  const activeInterns = filteredUsers.filter(
+  const activeInterns = users.filter(
     (user) => user.role === "estagiario" && user.active !== false,
   ).length;
-  const inactiveAccounts = filteredUsers.filter(
-    (user) => user.active === false,
-  ).length;
+  const inactiveAccounts = users.filter((user) => user.active === false).length;
 
   const ACCOUNTS_PER_PAGE = 4;
   const totalAccountsPages = Math.ceil(
@@ -268,6 +241,7 @@ export const AdminOverviewPage: React.FC = () => {
       setFormCompany(user.company || "");
       setFormProjectIds(user.projectIds || []);
       setFormActive(user.active !== false);
+      setProjectSearchTerm("");
     } else {
       setEditingUserId(null);
       setFormName("");
@@ -543,19 +517,19 @@ export const AdminOverviewPage: React.FC = () => {
           />
           <StatCard
             icon="📋"
-            label="Atividades filtradas"
+            label="Atividades totais"
             value={`${filteredActivities.length}`}
           />
           <StatCard
             icon="⏱"
-            label="Horas visíveis"
+            label="Horas totais"
             value={formatHours(totalHours)}
           />
         </div>
 
-        {/* ── Filtros de contas ─────────────────────────────────────────────────── */}
+        {/* ── Gestão de contas ──────────────────────────────────────────────────── */}
         <Card>
-          <CardHeader className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <CardBody className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <CardTitle>Gestão de contas</CardTitle>
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => openWizard()} size="sm">
@@ -565,45 +539,6 @@ export const AdminOverviewPage: React.FC = () => {
                 Atualizar
               </Button>
             </div>
-          </CardHeader>
-          <CardBody className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Input
-              label="Pesquisar"
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              placeholder="Nome, email, empresa"
-            />
-            <Select
-              label="Equipa"
-              value={filterTeamId}
-              onChange={(event) => setFilterTeamId(event.target.value)}
-              options={teams.map((team) => ({
-                value: team.id,
-                label: team.name,
-              }))}
-            />
-            <Select
-              label="Projeto"
-              value={filterProjectId}
-              onChange={(event) => setFilterProjectId(event.target.value)}
-              options={projects.map((project) => ({
-                value: project.id,
-                label: project.name,
-              }))}
-            />
-            <Select
-              label="Estado"
-              value={filterStatus}
-              onChange={(event) =>
-                setFilterStatus(
-                  event.target.value as "" | "active" | "inactive",
-                )
-              }
-              options={[
-                { value: "active", label: "Ativas" },
-                { value: "inactive", label: "Inativas" },
-              ]}
-            />
           </CardBody>
         </Card>
 
@@ -619,7 +554,125 @@ export const AdminOverviewPage: React.FC = () => {
           <Alert type="error" message={error} onClose={() => setError(null)} />
         )}
 
-        {/* ── Gestão de Equipas ─────────────────────────────────────────────────── */}
+        {/* ── Cards de utilizadores ─────────────────────────────────────────────── */}
+        <div className="flex min-h-[320px] flex-col gap-4">
+          <div className="grid gap-4 xl:grid-cols-2">
+            {paginatedUsers.map((member) => {
+              const memberActivities = activities.filter(
+                (activity) => activity.userId === member.id,
+              );
+              const memberHours = memberActivities.reduce(
+                (sum, activity) =>
+                  sum +
+                  calculateHours(
+                    formatTime(activity.startTime),
+                    formatTime(activity.endTime),
+                  ),
+                0,
+              );
+              return (
+                <Card
+                  key={member.id}
+                  className={member.active === false ? "opacity-75" : ""}
+                >
+                  <CardBody className="space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-lg font-semibold text-navy">
+                          {member.name}
+                        </div>
+                        <div className="mt-1 text-sm text-slate-500">
+                          {member.email}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <Badge label={getRoleLabel(member.role)} />
+                        <Badge
+                          label={member.active === false ? "Inativa" : "Ativa"}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                        <div className="text-slate-500">Equipa</div>
+                        <div className="mt-1 font-medium text-navy">
+                          {member.teamName || "Sem equipa"}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                        <div className="text-slate-500">Projetos</div>
+                        <div className="mt-1 font-medium text-navy">
+                          {member.projectIds?.length || 0}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                        <div className="text-slate-500">Horas registadas</div>
+                        <div className="mt-1 font-medium text-navy">
+                          {formatHours(memberHours)}
+                        </div>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
+                        <div className="text-slate-500">Estado</div>
+                        <div className="mt-1 font-medium text-navy">
+                          {member.active === false ? "Inativa" : "Ativa"}
+                        </div>
+                      </div>
+                    </div>
+
+                    {member.projectIds && member.projectIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {member.projectIds.map((projectId) => {
+                          const project = projects.find(
+                            (item) => item.id === projectId,
+                          );
+                          return (
+                            <span
+                              key={projectId}
+                              className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700"
+                            >
+                              {project?.name || projectId}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => openWizard(member)}
+                      >
+                        Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={member.active === false ? "success" : "danger"}
+                        onClick={() => toggleUserActive(member)}
+                      >
+                        {member.active === false ? "Ativar" : "Desativar"}
+                      </Button>
+                    </div>
+                  </CardBody>
+                </Card>
+              );
+            })}
+          </div>
+
+          {totalAccountsPages > 1 && (
+            <div className="mt-auto border-t border-slate-200 pt-4">
+              <Pagination
+                currentPage={accountsPage}
+                totalPages={totalAccountsPages}
+                onPageChange={setAccountsPage}
+                className="justify-center"
+              />
+            </div>
+          )}
+        </div>
+
+        {/* ── Gestão de Equipas ───────────────────────────────────────────────── */}
         <Card>
           <CardHeader className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <CardTitle>Equipas</CardTitle>
@@ -781,128 +834,6 @@ export const AdminOverviewPage: React.FC = () => {
             )}
           </CardBody>
         </Card>
-
-        {/* ── Cards de utilizadores ─────────────────────────────────────────────── */}
-        <div className="flex min-h-[320px] flex-col gap-4">
-          <div className="grid gap-4 xl:grid-cols-2">
-            {paginatedUsers.map((member) => {
-              const memberActivities = activities.filter(
-                (activity) => activity.userId === member.id,
-              );
-              const memberHours = memberActivities.reduce(
-                (sum, activity) =>
-                  sum +
-                  calculateHours(
-                    formatTime(activity.startTime),
-                    formatTime(activity.endTime),
-                  ),
-                0,
-              );
-              return (
-                <Card
-                  key={member.id}
-                  className={member.active === false ? "opacity-75" : ""}
-                >
-                  <CardBody className="space-y-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-lg font-semibold text-navy">
-                          {member.name}
-                        </div>
-                        <div className="mt-1 text-sm text-slate-500">
-                          {member.email}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <Badge
-                          label={
-                            member.role === "admin" ? "Admin" : "Estagiário"
-                          }
-                        />
-                        <Badge
-                          label={member.active === false ? "Inativa" : "Ativa"}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                        <div className="text-slate-500">Equipa</div>
-                        <div className="mt-1 font-medium text-navy">
-                          {member.teamName || "Sem equipa"}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                        <div className="text-slate-500">Projetos</div>
-                        <div className="mt-1 font-medium text-navy">
-                          {member.projectIds?.length || 0}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                        <div className="text-slate-500">Horas registadas</div>
-                        <div className="mt-1 font-medium text-navy">
-                          {formatHours(memberHours)}
-                        </div>
-                      </div>
-                      <div className="rounded-2xl bg-slate-50 p-3 text-sm">
-                        <div className="text-slate-500">Estado</div>
-                        <div className="mt-1 font-medium text-navy">
-                          {member.active === false ? "Inativa" : "Ativa"}
-                        </div>
-                      </div>
-                    </div>
-
-                    {member.projectIds && member.projectIds.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {member.projectIds.map((projectId) => {
-                          const project = projects.find(
-                            (item) => item.id === projectId,
-                          );
-                          return (
-                            <span
-                              key={projectId}
-                              className="rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700"
-                            >
-                              {project?.name || projectId}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => openWizard(member)}
-                      >
-                        Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={member.active === false ? "success" : "danger"}
-                        onClick={() => toggleUserActive(member)}
-                      >
-                        {member.active === false ? "Ativar" : "Desativar"}
-                      </Button>
-                    </div>
-                  </CardBody>
-                </Card>
-              );
-            })}
-          </div>
-
-          {totalAccountsPages > 1 && (
-            <div className="mt-auto border-t border-slate-200 pt-4">
-              <Pagination
-                currentPage={accountsPage}
-                totalPages={totalAccountsPages}
-                onPageChange={setAccountsPage}
-                className="justify-center"
-              />
-            </div>
-          )}
-        </div>
 
         {/* ── Atividades recentes ───────────────────────────────────────────────── */}
         <div
@@ -1115,36 +1046,40 @@ export const AdminOverviewPage: React.FC = () => {
                 />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-slate-700">
-                    Password temporária
-                  </label>
-                  <input
-                    value={formPassword}
-                    onChange={(event) => setFormPassword(event.target.value)}
-                    placeholder="Gerada automaticamente"
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
-                  />
-                </div>
+                {!editingUserId && (
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-slate-700">
+                      Password temporária
+                    </label>
+                    <input
+                      value={formPassword}
+                      onChange={(event) => setFormPassword(event.target.value)}
+                      placeholder="Gerada automaticamente"
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors placeholder:text-slate-400 focus:border-primary-500 focus:outline-none"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="mb-1 block text-sm font-medium text-slate-700">
                     Papel / perfil do utilizador
                   </label>
-                  <select
+                  <input
                     value={formRole}
                     onChange={(event) =>
                       setFormRole(event.target.value as UserRole)
                     }
+                    list="role-suggestions"
+                    placeholder="Ex: estagiario, admin, coordenador"
                     className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-navy transition-colors focus:border-primary-500 focus:outline-none"
-                  >
-                    {ROLE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
+                  />
+                  <datalist id="role-suggestions">
+                    {roleSuggestions.map((role) => (
+                      <option key={role} value={role} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
               </div>
+
               <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <div>
                   <div className="text-sm font-medium text-navy">
@@ -1251,7 +1186,7 @@ export const AdminOverviewPage: React.FC = () => {
                   ))}
                 </div>
               )}
-              <div className="mt-3 max-h-48 space-y-2 overflow-y-auto pr-1">
+              <div className="mt-3 max-h-60 space-y-3 overflow-y-auto pr-1">
                 {filteredProjectOptions.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
                     Nenhum projeto encontrado.
@@ -1264,26 +1199,34 @@ export const AdminOverviewPage: React.FC = () => {
                         key={project.id}
                         type="button"
                         onClick={() => toggleProject(project.id)}
-                        className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left text-sm transition ${
+                        className={`flex w-full items-start justify-between gap-4 rounded-xl border px-4 py-4 text-left transition ${
                           isSelected
-                            ? "border-primary-500 bg-primary-50 text-primary-700"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                            ? "border-primary-500 bg-primary-50"
+                            : "border-slate-200 bg-white hover:border-slate-300"
                         }`}
                       >
-                        <div className="min-w-0">
-                          <div className="font-medium">{project.name}</div>
-                          <div className="mt-1 text-xs text-slate-500">
+                        <div className="min-w-0 flex-1">
+                          <div
+                            className={`text-sm font-semibold ${
+                              isSelected ? "text-primary-700" : "text-navy"
+                            }`}
+                          >
+                            {project.name}
+                          </div>
+
+                          <div className="mt-1 text-sm text-slate-500">
                             {project.code}
                             {project.description
                               ? ` · ${project.description}`
                               : ""}
                           </div>
                         </div>
+
                         <div
-                          className={`ml-3 inline-flex h-5 w-5 items-center justify-center rounded border-2 text-[11px] transition ${
+                          className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition ${
                             isSelected
                               ? "border-primary-500 bg-primary-500 text-white"
-                              : "border-slate-300 text-transparent"
+                              : "border-slate-300 bg-white text-transparent"
                           }`}
                         >
                           ✓
@@ -1383,3 +1326,4 @@ export const AdminOverviewPage: React.FC = () => {
 };
 
 export default AdminOverviewPage;
+

@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { User, Activity } from "@/types";
-import { authService, activityService } from "@/services";
+import type { User, Activity, Project } from "@/types";
+import { authService, activityService, projectService } from "@/services";
 
 interface AppStore {
   user: User | null;
@@ -9,6 +9,10 @@ interface AppStore {
   logout: () => void;
   setUser: (user: User | null) => void;
   refreshUser: () => Promise<void>;
+
+  projects: Project[];
+  setProjects: (projects: Project[]) => void;
+  loadProjects: () => Promise<void>;
 
   activities: Activity[];
   setActivities: (activities: Activity[]) => void;
@@ -21,6 +25,12 @@ interface AppStore {
 export const useAppStore = create<AppStore>((set) => ({
   user: authService.getCurrentUser() || null,
   isLoading: false,
+  projects: [],
+  setProjects: (projects) => set({ projects }),
+  loadProjects: async () => {
+    const allProjects = await projectService.loadAll();
+    set({ projects: allProjects });
+  },
 
   login: async (email: string, password: string) => {
     set({ isLoading: true });
@@ -35,7 +45,7 @@ export const useAppStore = create<AppStore>((set) => ({
 
   logout: () => {
     authService.logout();
-    set({ user: null, activities: [] });
+    set({ user: null, projects: [], activities: [] });
   },
 
   setUser: (user) => set({ user }),

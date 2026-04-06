@@ -100,11 +100,14 @@ export const DashboardPage: React.FC = () => {
   const today = new Date().toISOString().split("T")[0];
 
   const allRecentActivities = useMemo(() => {
-    return [...scopedActivities].sort(
-      (a, b) =>
-        b.date.localeCompare(a.date) || b.startTime.localeCompare(a.startTime),
-    );
-  }, [scopedActivities]);
+    return [...scopedActivities]
+      .filter((activity) => weekDates.includes(activity.date))
+      .sort(
+        (a, b) =>
+          b.date.localeCompare(a.date) ||
+          b.startTime.localeCompare(a.startTime),
+      );
+  }, [scopedActivities, weekDates]);
 
   const RECENT_ACTIVITIES_PER_PAGE = 4;
   const DIFFICULTIES_PER_PAGE = 4;
